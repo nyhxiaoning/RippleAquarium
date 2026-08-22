@@ -29,6 +29,7 @@ interface CoralReefSettings {
   maxCount?: number;
   seed?: number;
   exclusionZones?: ExclusionZone[];
+  halfSize?: THREE.Vector3;
 }
 
 type CoralRebuildSettings = Partial<Pick<CoralReef, "count" | "scale">> & {
@@ -43,10 +44,12 @@ export interface CoralReef {
   animatedGrowth: number[] | null;
   seed: number;
   exclusionZones: ExclusionZone[];
+  halfSize: THREE.Vector3;
   corals: CoralState[];
   meshes: THREE.InstancedMesh[];
   rebuild(nextSettings?: CoralRebuildSettings): void;
   update(now?: number): void;
+  resize(halfSize: THREE.Vector3): void;
   dispose(): void;
 }
 
@@ -80,6 +83,7 @@ export async function createCoralReef({
   maxCount = 200,
   seed = 73,
   exclusionZones = [],
+  halfSize = aquariumHalfSize,
 }: CoralReefSettings = {}): Promise<CoralReef> {
   const models = await loadCoralModels();
   const group = new THREE.Group();
@@ -93,6 +97,7 @@ export async function createCoralReef({
     animatedGrowth: null,
     seed,
     exclusionZones,
+    halfSize,
     // Logical corals shared with consumers (e.g. clownfish avoidance). Each entry
     // mirrors what a standalone Mesh used to expose: visible, world position,
     // rendered uniform scale.
@@ -115,6 +120,23 @@ export async function createCoralReef({
     update(now = performance.now()) {
       if (Array.isArray(reef.animatedGrowth)) return;
       if (updateCoralGrowth(reef, now)) syncCorals(reef);
+    },
+    resize(nextHalfSize: THREE.Vector3) {
+      reef.halfSize = nextHalfSize;
+      // Keep corals where they are; only re-sample those that fall outside the new
+      // tank footprint so a shrink/grow feels continuous rather than jarring.
+      const reseed = mulberry32(reef.seed + 4242);
+      for (const coral of reef.corals) {
+        const inset = coralPlacementInset;
+        if (
+          Math.abs(coral.position.x) > reef.halfSize.x - inset ||
+          Math.abs(coral.position.z) > reef.halfSize.z - inset
+        ) {
+          const position = sampleCoralPosition(reseed, reef.exclusionZones, reef.halfSize);
+          coral.position.set(position.x, aquariumFloorY + 0.015, position.z);
+        }
+      }
+      syncCorals(reef);
     },
     dispose() {
       group.clear();
@@ -228,13 +250,13 @@ function buildCoralPool(reef: CoralReef, models: CoralModel[]): void {
   }
 }
 
-function sampleCoralPosition(random: RandomSource, exclusionZones: ExclusionZone[]) {
+function sampleCoralPosition(random: RandomSource, exclusionZones: ExclusionZone[], halfSize: THREE.Vector3 = aquariumHalfSize) {
   const fallback = { x: 0, z: 0 };
 
   for (let attempt = 0; attempt < 32; attempt += 1) {
     const position = {
-      x: randomSignedRange(random, aquariumHalfSize.x - coralPlacementInset),
-      z: randomSignedRange(random, aquariumHalfSize.z - coralPlacementInset),
+      x: randomSignedRange(random, halfSize.x - coralPlacementInset),
+      z: randomSignedRange(random, halfSize.z - coralPlacementInset),
     };
     fallback.x = position.x;
     fallback.z = position.z;
@@ -246,12 +268,12 @@ function sampleCoralPosition(random: RandomSource, exclusionZones: ExclusionZone
 
   fallback.x = THREE.MathUtils.clamp(
     fallback.x,
-    -aquariumHalfSize.x + coralPlacementInset,
-    aquariumHalfSize.x - coralPlacementInset,
+    -halfSize.x + coralPlacementInset,
+    halfSize.x - coralPlacementInset,
   );
   fallback.z = fallback.z < 0
-    ? -aquariumHalfSize.z + coralPlacementInset
-    : aquariumHalfSize.z - coralPlacementInset;
+    ? -halfSize.z + coralPlacementInset
+    : halfSize.z - coralPlacementInset;
   return fallback;
 }
 

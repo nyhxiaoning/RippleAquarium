@@ -15,6 +15,7 @@ import {
 import { createFishModelInstanceByKey } from "./fish/model-loader.js";
 import { writeFishOrientationQuaternion } from "./fish/pose.js";
 import { mulberry32 } from "./random.js";
+import type { ExclusionZone } from "./types.js";
 
 const maxCount = 40;
 const floorOffset = 0.72;
@@ -31,7 +32,14 @@ const tmpDirection = new THREE.Vector3();
 const tmpRepel = new THREE.Vector3();
 const tmpCorrection = new THREE.Vector3();
 
-export function createClownfishSchool(coralReef, { count = 18, seed = 211 } = {}) {
+export function createClownfishSchool(
+  coralReef,
+  { count = 18, seed = 211, avoidanceZones = clownfishAvoidanceZones }: {
+    count?: number;
+    seed?: number;
+    avoidanceZones?: ExclusionZone[];
+  } = {},
+) {
   const { geometry, material } = createFishModelInstanceByKey("clown");
   addFishCurveAttributes(geometry, maxCount);
   enableFishCurveDeformation(material);
@@ -49,13 +57,15 @@ export function createClownfishSchool(coralReef, { count = 18, seed = 211 } = {}
   );
 
   const random = mulberry32(seed);
-  const fish = Array.from({ length: maxCount }, (_, index) => createClownfish(index, random));
+  const fish = Array.from({ length: maxCount }, (_, index) =>
+    createClownfish(index, random, avoidanceZones),
+  );
   function update(time, dt) {
     const step = Math.min(dt, 1 / 30);
     for (const item of fish) {
       if (item.index >= mesh.count) continue;
 
-      updateClownfish(item, coralReef, step, time);
+      updateClownfish(item, coralReef, step, time, avoidanceZones);
       writeFishOrientationQuaternion(item, item.velocity, tmpQuaternion);
       updateFishCurveAttributes(curveAttributes, item.index, item, tmpQuaternion);
       tmpScale.setScalar(swimScale);
@@ -87,8 +97,8 @@ function normalizeCount(count) {
   return THREE.MathUtils.clamp(Math.floor(count), 0, maxCount);
 }
 
-function createClownfish(index, random) {
-  const position = createClownfishPosition(random);
+function createClownfish(index, random, zones: ExclusionZone[] = clownfishAvoidanceZones) {
+  const position = createClownfishPosition(random, zones);
   const angle = random() * Math.PI * 2;
   const speed = THREE.MathUtils.lerp(0.42, 0.78, random());
 
@@ -104,12 +114,12 @@ function createClownfish(index, random) {
   };
 }
 
-function createClownfishPosition(random) {
+function createClownfishPosition(random, zones: ExclusionZone[] = clownfishAvoidanceZones) {
   const fallback = new THREE.Vector3();
 
   for (let attempt = 0; attempt < spawnRetryCount; attempt += 1) {
     const position = randomClownfishPosition(random);
-    if (!isInsideDecorZones(position)) {
+    if (!isInsideDecorZones(position, zones)) {
       return position;
     }
     if (attempt === 0) {
@@ -117,7 +127,7 @@ function createClownfishPosition(random) {
     }
   }
 
-  pushPositionOutOfDecorZones(fallback);
+  pushPositionOutOfDecorZones(fallback, zones);
   return fallback;
 }
 
@@ -129,7 +139,7 @@ function randomClownfishPosition(random) {
   );
 }
 
-function updateClownfish(item, coralReef, dt, time) {
+function updateClownfish(item, coralReef, dt, time, zones: ExclusionZone[] = clownfishAvoidanceZones) {
   const homeY = aquariumFloorY + floorOffset + verticalRange * 0.42;
   tmpRepel.set(0, 0, 0);
 
@@ -143,7 +153,7 @@ function updateClownfish(item, coralReef, dt, time) {
       tmpRepel.addScaledVector(offset.normalize(), (avoidRadius * avoidRadius - distanceSq) / avoidRadius);
     }
   }
-  repelFromDecorZones(item, tmpRepel);
+  repelFromDecorZones(item, tmpRepel, zones);
 
   const topY = aquariumFloorY + floorOffset + verticalRange;
   const bottomY = aquariumFloorY + floorOffset * 0.45;
@@ -164,7 +174,7 @@ function updateClownfish(item, coralReef, dt, time) {
   item.velocity.addScaledVector(tmpRepel, dt);
   item.velocity.clampLength(0.32, 0.9);
   item.position.addScaledVector(item.velocity, dt);
-  if (pushPositionOutOfDecorZones(item.position)) {
+  if (pushPositionOutOfDecorZones(item.position, zones)) {
     item.velocity.addScaledVector(tmpCorrection, 5).clampLength(0.32, 0.9);
   }
   item.swimPhase += dt * 8.5;
@@ -172,8 +182,8 @@ function updateClownfish(item, coralReef, dt, time) {
   item.curveBendWorld.copy(item.velocity).normalize().multiplyScalar(0.2 * item.turnBias);
 }
 
-function repelFromDecorZones(item, repel) {
-  for (const zone of clownfishAvoidanceZones) {
+function repelFromDecorZones(item, repel, zones: ExclusionZone[] = clownfishAvoidanceZones) {
+  for (const zone of zones) {
     if (zone.shape === "box") {
       repelFromBoxZone(item, repel, zone);
       continue;
@@ -199,8 +209,8 @@ function repelFromCircleZone(item, repel, zone) {
   );
 }
 
-function isInsideDecorZones(position) {
-  for (const zone of clownfishAvoidanceZones) {
+function isInsideDecorZones(position, zones: ExclusionZone[] = clownfishAvoidanceZones) {
+  for (const zone of zones) {
     if (isInsideDecorZone(position, zone)) {
       return true;
     }
@@ -217,14 +227,14 @@ function isInsideDecorZone(position, zone) {
   return readCircleZoneDepth(position, zone) !== null;
 }
 
-function pushPositionOutOfDecorZones(position) {
+function pushPositionOutOfDecorZones(position, zones: ExclusionZone[] = clownfishAvoidanceZones) {
   let pushed = false;
   tmpCorrection.set(0, 0, 0);
 
   for (let pass = 0; pass < decorPushPasses; pass += 1) {
     let passPushed = false;
 
-    for (const zone of clownfishAvoidanceZones) {
+    for (const zone of zones) {
       const correction = zone.shape === "box"
         ? readBoxZoneCorrection(position, zone)
         : readCircleZoneCorrection(position, zone);

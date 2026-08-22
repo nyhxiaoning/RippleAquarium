@@ -126,6 +126,11 @@ export class FishSchoolSimulation {
     }
   }
 
+  /** Point the simulation at a live, mutable bounds vector (owned by AquariumManager). */
+  setBounds(halfSize: THREE.Vector3): void {
+    this.aquariumHalfSize = halfSize;
+  }
+
   createFish(index = this.fish.length): FishState {
     const position = randomPointInAquarium(this.random, this.aquariumHalfSize, 0.62);
     const direction = randomPointInSphere(this.random, 1).normalize();

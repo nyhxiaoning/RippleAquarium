@@ -328,11 +328,20 @@ export function createWaterSurface(renderer) {
     writeTarget.dispose();
   }
 
+  /** Rebuild the water plane for a new tank footprint. Render targets stay the
+   *  same resolution; only the world-space mapping uniform changes. */
+  function resize(halfSize) {
+    mesh.geometry.dispose();
+    mesh.geometry = new THREE.PlaneGeometry(halfSize.x * 2, halfSize.z * 2, 180, 140);
+    simulationMaterial.uniforms.uWorldSize.value.set(halfSize.x * 2, halfSize.z * 2);
+  }
+
   return {
     mesh,
     update,
     queueImpact,
     setSettings,
+    resize,
     dispose,
   };
 }

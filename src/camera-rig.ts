@@ -7,6 +7,12 @@ const CAMERA_MODE = {
   fish: "fish",
 };
 
+const DEFAULT_HALF_SIZE = new THREE.Vector3(11, 6.6, 8.5);
+const DEFAULT_CAMERA_POSITION = new THREE.Vector3(0, 9.8, 27);
+const DEFAULT_TARGET = new THREE.Vector3(0, 1.7, 0);
+const DEFAULT_MAX_DISTANCE = 38;
+const DEFAULT_MIN_DISTANCE = 6;
+
 const FISH_CAMERA_POSITION_RESPONSE = 10;
 const FISH_CAMERA_DIRECTION_RESPONSE = 5;
 const FISH_CAMERA_LOOK_AHEAD = 3.6;
@@ -98,6 +104,28 @@ export function createCameraRig(renderer) {
       orbitCamera.updateProjectionMatrix();
       fishCamera.aspect = aspect;
       fishCamera.updateProjectionMatrix();
+    },
+
+    /** Frame the orbit camera for a given tank size. Scales from the default
+     *  size, so the default style keeps its exact original framing. */
+    configure(halfSize) {
+      const sx = halfSize.x / DEFAULT_HALF_SIZE.x;
+      const sy = halfSize.y / DEFAULT_HALF_SIZE.y;
+      const sz = halfSize.z / DEFAULT_HALF_SIZE.z;
+
+      orbitCamera.position.set(
+        DEFAULT_CAMERA_POSITION.x * sx,
+        DEFAULT_CAMERA_POSITION.y * sy,
+        DEFAULT_CAMERA_POSITION.z * sz,
+      );
+      controls.target.set(
+        DEFAULT_TARGET.x * sx,
+        DEFAULT_TARGET.y * sy,
+        DEFAULT_TARGET.z * sz,
+      );
+      controls.maxDistance = DEFAULT_MAX_DISTANCE * Math.max(sx, sz);
+      controls.minDistance = DEFAULT_MIN_DISTANCE * Math.min(sx, sz);
+      controls.update();
     },
   };
 }

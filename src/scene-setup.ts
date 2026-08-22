@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { aquariumFloorY, aquariumSize, waterLevelY } from "./config.js";
+import { aquariumHalfSize } from "./config.js";
 import { createWaterSurface } from "./water-surface.js";
 
 export function createRenderer(canvas) {
@@ -54,7 +54,7 @@ export function addLighting(scene) {
   };
 }
 
-export function addAquarium(scene, renderer) {
+export function createAquariumShell(scene, renderer, halfSize) {
   const effects = [];
 
   const glassMaterial = new THREE.MeshPhysicalMaterial({
@@ -71,7 +71,7 @@ export function addAquarium(scene, renderer) {
   });
 
   const aquariumGlass = new THREE.Mesh(
-    new THREE.BoxGeometry(aquariumSize.x, aquariumSize.y, aquariumSize.z),
+    new THREE.BoxGeometry(halfSize.x * 2, halfSize.y * 2, halfSize.z * 2),
     glassMaterial,
   );
   scene.add(aquariumGlass);
@@ -87,7 +87,7 @@ export function addAquarium(scene, renderer) {
   scene.add(aquariumEdges);
 
   const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(aquariumSize.x, aquariumSize.z),
+    new THREE.PlaneGeometry(halfSize.x * 2, halfSize.z * 2),
     new THREE.MeshStandardMaterial({
       color: 0x17222a,
       roughness: 0.9,
@@ -95,7 +95,7 @@ export function addAquarium(scene, renderer) {
     }),
   );
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = aquariumFloorY - 0.008;
+  floor.position.y = -halfSize.y - 0.008;
   floor.receiveShadow = true;
   scene.add(floor);
 
@@ -112,18 +112,52 @@ export function addAquarium(scene, renderer) {
   scene.add(floorEdges);
 
   const waterSurface = createWaterSurface(renderer);
+  waterSurface.resize(halfSize);
   scene.add(waterSurface.mesh);
   effects.push(waterSurface);
-  effects.push(addBubbleColumns(scene));
+  const bubbles = addBubbleColumns(scene, halfSize);
+  effects.push(bubbles);
 
   return {
+    glass: aquariumGlass,
+    floor,
+    floorEdges,
+    aquariumEdges,
     waterSurface,
     update(time) {
       for (const effect of effects) {
         effect.update?.(time);
       }
     },
+    resize(nextHalfSize) {
+      aquariumGlass.geometry.dispose();
+      aquariumGlass.geometry = new THREE.BoxGeometry(
+        nextHalfSize.x * 2,
+        nextHalfSize.y * 2,
+        nextHalfSize.z * 2,
+      );
+      aquariumEdges.geometry = new THREE.EdgesGeometry(aquariumGlass.geometry);
+
+      floor.geometry.dispose();
+      floor.geometry = new THREE.PlaneGeometry(nextHalfSize.x * 2, nextHalfSize.z * 2);
+      floorEdges.geometry = new THREE.EdgesGeometry(floor.geometry);
+      floor.position.y = -nextHalfSize.y - 0.008;
+      floorEdges.position.copy(floor.position);
+
+      waterSurface.resize(nextHalfSize);
+    },
+    dispose() {
+      aquariumGlass.geometry.dispose();
+      aquariumEdges.geometry.dispose();
+      floor.geometry.dispose();
+      floorEdges.geometry.dispose();
+    },
   };
+}
+
+/** Backwards-compatible wrapper around createAquariumShell using the default size. */
+export function addAquarium(scene, renderer) {
+  return createAquariumShell(scene, renderer, aquariumHalfSize);
 }
 
 export function addObstacles(scene, obstacles) {
@@ -155,7 +189,7 @@ function createObstacleGeometry(obstacle) {
   return new THREE.SphereGeometry(obstacle.radius, 32, 18);
 }
 
-function addBubbleColumns(scene) {
+function addBubbleColumns(scene, halfSize) {
   const count = 84;
   const geometry = new THREE.SphereGeometry(0.035, 8, 6);
   const material = new THREE.MeshPhysicalMaterial({
@@ -192,14 +226,16 @@ function addBubbleColumns(scene) {
   }
 
   function update(time) {
-    const height = waterLevelY - aquariumFloorY - 0.45;
+    const floorY = -halfSize.y;
+    const waterY = halfSize.y - 0.72;
+    const height = waterY - floorY - 0.45;
 
     for (let i = 0; i < count; i += 1) {
       const bubble = starts[i];
       const t = (bubble.phase + time * bubble.speed) % 1;
       position.set(
         bubble.x + Math.sin(time * 1.2 + i) * 0.08,
-        aquariumFloorY + 0.24 + t * height,
+        floorY + 0.24 + t * height,
         bubble.z + Math.cos(time * 1.45 + i * 0.7) * 0.08,
       );
       const s = bubble.size * (0.55 + t * 0.55);
