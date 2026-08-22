@@ -1,6 +1,8 @@
 import * as THREE from "three";
-import { simulationSettings } from "../config.js";
+import { pineappleHouseDecor, simulationSettings } from "../config.js";
 import { addLighting, addObstacles, createAquariumShell } from "../scene-setup.js";
+import { createPineappleHouseDecor } from "../decor/pineapple-house.js";
+import { createSpongebobPatrickDecor } from "../decor/spongebob-patrick.js";
 import { createFishSchool, createPlantSchool } from "./species-catalog.js";
 import type {
   AquariumDescriptor,
@@ -105,8 +107,8 @@ export async function buildAquariumScene(
     descriptor.aquarium.halfSize.y,
     descriptor.aquarium.halfSize.z,
   );
-  const waterLevelY = halfSize.y - 0.72;
-  const aquariumFloorY = -halfSize.y;
+  let waterLevelY = halfSize.y - 0.72;
+  let aquariumFloorY = -halfSize.y;
 
   const lighting = addLighting(root);
   lighting.setIntensity(descriptor.theme.lighting.hemiIntensity);
@@ -145,12 +147,53 @@ export async function buildAquariumScene(
   }
 
   const ctx = { coralReef: plantSchools.get("coral") ?? null };
-  for (const entry of descriptor.fish) {
-    const school = createFishSchool(entry.speciesId, entry.count, speciesDeps, ctx);
-    if (school) {
-      school.group.name = `Fish-${entry.speciesId}`;
-      root.add(school.group);
-      fishSchools.set(entry.speciesId, school);
+
+  function buildFishSchools(entries: AquariumDescriptor["fish"], context: typeof ctx) {
+    for (const entry of entries) {
+      const school = createFishSchool(entry.speciesId, entry.count, speciesDeps, context);
+      if (school) {
+        school.group.name = `Fish-${entry.speciesId}`;
+        root.add(school.group);
+        fishSchools.set(entry.speciesId, school);
+      }
+    }
+  }
+
+  /** Rebuild only the fish schools after their GLBs finish loading, preserving
+   *  the coral intro growth state and everything else. */
+  function refreshFishMeshes() {
+    const context = { coralReef: plantSchools.get("coral") ?? null };
+    for (const entry of descriptor.fish) {
+      const old = fishSchools.get(entry.speciesId);
+      if (old) {
+        root.remove(old.group);
+        old.dispose();
+        fishSchools.delete(entry.speciesId);
+      }
+    }
+    buildFishSchools(descriptor.fish, context);
+  }
+
+  buildFishSchools(descriptor.fish, ctx);
+
+  // Decor models (pineapple house, spongebob & patrick) stream in async.
+  for (const item of descriptor.decor) {
+    const position = new THREE.Vector3(item.position.x, item.position.y, item.position.z);
+    const object =
+      item.asset === "pineapple-house"
+        ? await createPineappleHouseDecor({
+            ...pineappleHouseDecor,
+            position,
+            rotationY: item.rotationY ?? pineappleHouseDecor.rotationY,
+            height: item.height,
+          })
+        : await createSpongebobPatrickDecor({
+            position,
+            height: item.height,
+          });
+    if (object) {
+      object.name = `Decor-${item.asset}`;
+      root.add(object);
     }
   }
 
@@ -168,6 +211,10 @@ export async function buildAquariumScene(
 
   function resize(nextHalfSize: THREE.Vector3) {
     halfSize.copy(nextHalfSize);
+    waterLevelY = halfSize.y - 0.72;
+    aquariumFloorY = -halfSize.y;
+    speciesDeps.waterLevelY = waterLevelY;
+    speciesDeps.aquariumFloorY = aquariumFloorY;
     shell.resize(halfSize);
     for (const school of fishSchools.values()) {
       school.resize?.(halfSize);
@@ -257,5 +304,20 @@ export async function buildAquariumScene(
     getHalfSize: () => halfSize,
     getWaterSurface: () => shell.waterSurface,
     getFish: (speciesId, index) => fishSchools.get(speciesId)?.getFish?.(index) ?? undefined,
+    getLighting: () => lighting,
+    setBoidsSettings(speciesId, settings) {
+      fishSchools.get(speciesId)?.setSettings?.(settings);
+    },
+    setPlantSettings(speciesId, settings) {
+      plantSchools.get(speciesId)?.setSettings?.(settings);
+    },
+    setCoralGrowth(count, scale, growth) {
+      const school = plantSchools.get("coral");
+      school?.rebuildWithGrowth?.(count, scale, growth);
+    },
+    getCoralMaxCount() {
+      return plantSchools.get("coral")?.getMaxCount?.() ?? 0;
+    },
+    refreshFishMeshes,
   };
 }

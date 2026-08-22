@@ -1,43 +1,20 @@
 import * as THREE from "three";
-import { FishSchoolSimulation } from "./fish-school-simulation.js";
-import { bindCameraToggle, createCameraRig } from "./camera-rig.js";
-import { createClownfishSchool } from "./clownfish-school.js";
-import { createCoralReef } from "./coral-reef.js";
-import { createPineappleHouseDecor } from "./decor/pineapple-house.js";
-import { createSpongebobPatrickDecor } from "./decor/spongebob-patrick.js";
-import {
-  aquariumHalfSize,
-  coralExclusionZones,
-  fishConfig,
-  obstacles,
-  simulationSettings,
-  waterLevelY,
-} from "./config.js";
-import {
-  createFishMeshByKey,
-  disposeFishMesh,
-  loadFishModel,
-  setFishMeshCount,
-  updateFishInstances,
-} from "./fish-renderer.js";
-import { createHeadingDebugger } from "./heading-debugger.js";
+import { DEFAULT_STYLE } from "./aquarium/presets.js";
+import { createAquariumManager } from "./aquarium/manager.js";
+import { createProjectPanel } from "./aquarium/ui-panel.js";
+import { createCameraRig, bindCameraToggle } from "./camera-rig.js";
 import {
   applyTranslations,
   getLanguage,
   setLanguage,
   t,
 } from "./i18n.js";
-import {
-  addLighting,
-  addObstacles,
-  addAquarium,
-  createRenderer,
-  createScene,
-} from "./scene-setup.js";
+import { createRenderer, createScene } from "./scene-setup.js";
+import { createHeadingDebugger } from "./heading-debugger.js";
 
 const STEP_FRAME_SECONDS = 1 / 60;
-const baseMinSpeed = simulationSettings.minSpeed;
-const baseMaxSpeed = simulationSettings.maxSpeed;
+const baseMinSpeed = 3;
+const baseMaxSpeed = 7.5;
 const app = getRequiredElement("#app");
 const canvas = getRequiredElement("#scene");
 const renderer = createRenderer(canvas);
@@ -49,16 +26,11 @@ const headingDebugger = createHeadingDebugger({
   enabled: query.get("debugHeading") === "1",
   frameLimit: Number(query.get("debugFrames")) || undefined,
 });
-const simulation = new FishSchoolSimulation({
-  aquariumHalfSize,
-  obstacles,
-  settings: simulationSettings,
-});
-const koiSettings = { ...simulationSettings };
-const koiSimulation = new FishSchoolSimulation({
-  aquariumHalfSize,
-  obstacles,
-  settings: koiSettings,
+
+const manager = createAquariumManager(DEFAULT_STYLE, {
+  renderer,
+  scene,
+  cameraRig,
 });
 
 const controls = {
@@ -102,13 +74,6 @@ const koiControlSettings = {
   koiTopMargin: "topBoundaryMargin",
 };
 
-let fishMesh = null;
-let koiMesh = null;
-const fishCapacity = Number(controls.count.input.max) || 260;
-const koiCapacity = Number(controls.koiCount.input.max) || 120;
-let clownfishSchool = null;
-let coralReef = null;
-let coralIntro = null;
 let simulationPaused = false;
 let pendingSimulationSteps = 0;
 let simulationTime = 0;
@@ -117,19 +82,17 @@ const waterPointer = {
   pointer: new THREE.Vector2(),
   previousPoint: null,
 };
-const waterInteraction = {
-  surfaceBand: 0.72,
-};
-const fishSurfaceState = new WeakMap();
 let controlsPanelHidden = false;
+let coralIntro: {
+  startedAt: number;
+  duration: number;
+  targetCount: number;
+  targetScale: number;
+  growthBuffer: number[];
+} | null = null;
 
-const lighting = addLighting(scene);
-lighting.setIntensity(readControlValue("light"));
-const aquariumEffects = addAquarium(scene, renderer);
-addObstacles(scene, obstacles);
-applySimulationSettingsFromControls();
-applyKoiSettingsFromControls();
-applyWaterSettingsFromControls();
+const fishSurfaceState = new WeakMap();
+
 bindControls();
 bindPlaybackControls();
 bindCameraToggle(cameraRig);
@@ -139,27 +102,24 @@ bindLanguageSwitcher();
 bindWaterPointer();
 const cameraPanel = bindCameraPanel(cameraRig);
 const modelLoading = bindModelLoading();
-simulation.reset(readControlValue("count"));
-koiSimulation.reset(readControlValue("koiCount"), 142);
-// Build meshes from the synchronous fallback model so the first frame renders
-// immediately, then hot-swap to the high-detail GLB once it streams in.
-rebuildFishMesh();
-rebuildKoiMesh();
+createProjectPanel(manager, getRequiredElement("#control-panel"));
+
+// Build the default scene immediately (fallback fish models), then hot-swap to
+// the high-detail GLBs once they stream in.
+void manager.init().then(() => {
+  applySimulationSettingsFromControls();
+  applyKoiSettingsFromControls();
+  applyWaterSettingsFromControls();
+  startCoralIntro();
+  modelLoading.finish();
+});
+manager.on("change", () => {
+  syncControlsToggle();
+});
+
 resize();
 window.addEventListener("resize", resize);
 renderer.setAnimationLoop(animate);
-void loadBackgroundSceneDetails();
-loadFishModel()
-  .then(() => {
-    rebuildFishMesh();
-    rebuildKoiMesh();
-  })
-  .catch((error) => {
-    console.warn("Fish model failed to load; keeping fallback.", error);
-  })
-  .finally(() => {
-    modelLoading.finish();
-  });
 
 function bindControls() {
   for (const [key, control] of Object.entries(controls)) {
@@ -168,40 +128,6 @@ function bindControls() {
       syncControlOutput(control);
       applyControlChange(key);
     });
-  }
-}
-
-async function loadBackgroundSceneDetails() {
-  const loadedCoralReef = await createCoralReef({
-    count: 0,
-    scale: 0,
-    maxCount: Number(controls.coralCount.input.max),
-    exclusionZones: coralExclusionZones,
-  });
-  coralReef = loadedCoralReef;
-  scene.add(coralReef.group);
-  startCoralIntro();
-
-  // The clownfish use the "clown" GLB (its pattern comes from the model's own
-  // texture), so wait for the fish models before building the school — otherwise
-  // it falls back to the untextured base mesh and loses its markings.
-  await loadFishModel().catch(() => {});
-  clownfishSchool = createClownfishSchool(coralReef, {
-    count: readControlValue("clownfishCount"),
-  });
-  scene.add(clownfishSchool.mesh);
-
-  void loadDecorModels();
-}
-
-async function loadDecorModels() {
-  const [pineappleHouse, spongebobPatrick] = await Promise.all([
-    createPineappleHouseDecor(),
-    createSpongebobPatrickDecor(),
-  ]);
-  scene.add(pineappleHouse);
-  if (spongebobPatrick) {
-    scene.add(spongebobPatrick);
   }
 }
 
@@ -219,7 +145,6 @@ function bindPlaybackControls() {
 
   stepButton.addEventListener("click", () => {
     if (!simulationPaused) return;
-
     pendingSimulationSteps += 1;
   });
 
@@ -232,7 +157,6 @@ function bindLanguageSwitcher() {
   document.querySelectorAll<HTMLElement>(".lang-btn").forEach((button) => {
     button.addEventListener("click", () => {
       if (!setLanguage(button.dataset.lang)) return;
-
       applyCurrentLanguage();
     });
   });
@@ -294,7 +218,7 @@ function bindWaterPointer() {
     if (!point) return;
 
     event.preventDefault();
-    aquariumEffects.waterSurface.queueImpact(point);
+    manager.getWaterSurface().queueImpact(point);
     waterPointer.previousPoint = point.clone();
   });
 
@@ -305,7 +229,7 @@ function bindWaterPointer() {
     if (!point) return;
 
     event.preventDefault();
-    aquariumEffects.waterSurface.queueImpact(waterPointer.previousPoint, point);
+    manager.getWaterSurface().queueImpact(waterPointer.previousPoint, point);
     waterPointer.previousPoint.copy(point);
   });
 
@@ -326,17 +250,15 @@ function getWaterIntersection(event) {
   );
   waterPointer.raycaster.setFromCamera(waterPointer.pointer, cameraRig.activeCamera);
 
+  const halfSize = manager.getHalfSize();
   const directionY = waterPointer.raycaster.ray.direction.y;
   if (Math.abs(directionY) < 0.000001) return null;
 
-  const distance = (waterLevelY - waterPointer.raycaster.ray.origin.y) / directionY;
+  const distance = (manager.getWaterLevelY() - waterPointer.raycaster.ray.origin.y) / directionY;
   if (distance < 0) return null;
 
   const point = waterPointer.raycaster.ray.at(distance, new THREE.Vector3());
-  if (
-    Math.abs(point.x) > aquariumHalfSize.x ||
-    Math.abs(point.z) > aquariumHalfSize.z
-  ) {
+  if (Math.abs(point.x) > halfSize.x || Math.abs(point.z) > halfSize.z) {
     return null;
   }
 
@@ -344,11 +266,11 @@ function getWaterIntersection(event) {
 }
 
 function queueFishSurfaceImpacts(fish) {
-  const surfaceBand = waterInteraction.surfaceBand;
+  const surfaceBand = readControlValue("surfaceBand");
   const cooldownSeconds = 0.16;
 
   for (const item of fish) {
-    const distanceToSurface = waterLevelY - item.position.y;
+    const distanceToSurface = manager.getWaterLevelY() - item.position.y;
     const previous = fishSurfaceState.get(item);
 
     if (
@@ -358,7 +280,7 @@ function queueFishSurfaceImpacts(fish) {
       (!previous || simulationTime - previous.time > cooldownSeconds)
     ) {
       const previousPoint = previous?.point ?? item.position;
-      aquariumEffects.waterSurface.queueImpact(previousPoint, item.position);
+      manager.getWaterSurface().queueImpact(previousPoint, item.position);
       fishSurfaceState.set(item, {
         time: simulationTime,
         point: item.position.clone(),
@@ -385,27 +307,26 @@ function syncPlaybackControls(toggleButton, stepButton) {
 
 function applyControlChange(key) {
   if (key === "count") {
-    setFishCount(readControlValue(key));
+    manager.setFishCount("sardine", readControlValue(key));
     return;
   }
 
   if (key === "koiCount") {
-    setKoiCount(readControlValue(key));
+    manager.setFishCount("koi", readControlValue(key));
     return;
   }
 
   if (key === "light") {
-    lighting.setIntensity(readControlValue(key));
+    manager.getLighting().setIntensity(readControlValue(key));
     return;
   }
 
   if (key === "clownfishCount") {
-    clownfishSchool?.setCount(readControlValue(key));
+    manager.setFishCount("clownfish", readControlValue(key));
     return;
   }
 
   if (key.startsWith("coral")) {
-    coralIntro = null;
     applyCoralSettingsFromControls();
     return;
   }
@@ -424,28 +345,25 @@ function applyControlChange(key) {
 }
 
 function applySimulationSettingsFromControls() {
+  const patch: Record<string, number> = {};
   for (const [key, settingName] of Object.entries(simulationControlSettings)) {
-    simulationSettings[settingName] = readControlValue(key);
+    patch[settingName] = readControlValue(key);
   }
-  applySpeedScale(simulationSettings, readControlValue("speedScale"));
+  manager.setBoidsSettings("sardine", patch);
+  manager.setBoidsSpeedScale("sardine", readControlValue("speedScale"));
 }
 
 function applyKoiSettingsFromControls() {
+  const patch: Record<string, number> = {};
   for (const [key, settingName] of Object.entries(koiControlSettings)) {
-    koiSettings[settingName] = readControlValue(key);
+    patch[settingName] = readControlValue(key);
   }
-  applySpeedScale(koiSettings, readControlValue("koiSpeedScale"));
-}
-
-function applySpeedScale(settings, scale) {
-  const normalizedScale = Number.isFinite(scale) ? scale : 1;
-  settings.minSpeed = baseMinSpeed * normalizedScale;
-  settings.maxSpeed = baseMaxSpeed * normalizedScale;
+  manager.setBoidsSettings("koi", patch);
+  manager.setBoidsSpeedScale("koi", readControlValue("koiSpeedScale"));
 }
 
 function applyWaterSettingsFromControls() {
-  waterInteraction.surfaceBand = readControlValue("surfaceBand");
-  aquariumEffects.waterSurface.setSettings({
+  manager.getWaterSurface().setSettings({
     force: readControlValue("waterForce"),
     radius: readControlValue("waterRadius"),
     displacement: readControlValue("waterHeight"),
@@ -454,113 +372,33 @@ function applyWaterSettingsFromControls() {
 }
 
 function applyCoralSettingsFromControls() {
-  coralReef?.rebuild({
+  manager.setPlantSettings("coral", {
     count: readControlValue("coralCount"),
     scale: readControlValue("coralScale"),
-    growth: null,
   });
 }
 
 function startCoralIntro() {
+  const targetCount = readControlValue("coralCount");
+  const targetScale = readControlValue("coralScale");
+  const maxCount = manager.getCoralMaxCount();
   coralIntro = {
     startedAt: performance.now(),
     duration: 3600,
-    targetCount: readControlValue("coralCount"),
-    targetScale: readControlValue("coralScale"),
-    growthBuffer: new Array(coralReef.maxCount).fill(0),
+    targetCount,
+    targetScale,
+    growthBuffer: new Array(maxCount).fill(0),
   };
-  coralReef.rebuild({ count: 0, scale: 0 });
-}
-
-function setFishCount(count) {
-  simulation.setCount(count);
-  setFishMeshCount(fishMesh, simulation.fish.length);
-  updateFishInstances(fishMesh, simulation.fish);
-  cameraRig.updateFishCamera(simulation.fish[fishConfig.highlightedIndex]);
-}
-
-function setKoiCount(count) {
-  koiSimulation.setCount(count);
-  setFishMeshCount(koiMesh, koiSimulation.fish.length);
-  if (koiMesh) {
-    updateFishInstances(koiMesh, koiSimulation.fish);
-  }
-}
-
-function rebuildFishMesh() {
-  if (fishMesh) {
-    scene.remove(fishMesh);
-    disposeFishMesh(fishMesh);
-  }
-
-  fishMesh = createFishMeshByKey(fishCapacity, "cartoon");
-  setFishMeshCount(fishMesh, simulation.fish.length);
-  scene.add(fishMesh);
-  updateFishInstances(fishMesh, simulation.fish);
-  cameraRig.updateFishCamera(simulation.fish[fishConfig.highlightedIndex]);
-}
-
-function rebuildKoiMesh() {
-  if (koiMesh) {
-    scene.remove(koiMesh);
-    disposeFishMesh(koiMesh);
-    koiMesh = null;
-  }
-
-  koiMesh = createFishMeshByKey(koiCapacity, "koi");
-  setFishMeshCount(koiMesh, koiSimulation.fish.length);
-  scene.add(koiMesh);
-  if (koiSimulation.fish.length > 0) {
-    updateFishInstances(koiMesh, koiSimulation.fish);
-  }
-}
-
-function animate() {
-  const frameDt = Math.min(clock.getDelta(), 1 / 30);
-  const simulationDt = getSimulationDelta(frameDt);
-  let trace = null;
-
-  if (simulationDt > 0) {
-    simulationTime += simulationDt;
-    trace = simulation.update(simulationDt, {
-      traceIndex: headingDebugger?.traceIndex,
-    });
-    koiSimulation.update(simulationDt);
-    updateFishInstances(fishMesh, simulation.fish);
-    if (koiMesh) {
-      updateFishInstances(koiMesh, koiSimulation.fish);
-    }
-    clownfishSchool?.update(simulationTime, simulationDt);
-    queueFishSurfaceImpacts(simulation.fish);
-    queueFishSurfaceImpacts(koiSimulation.fish);
-    headingDebugger?.sample({
-      dt: simulationDt,
-      fish: simulation.fish[fishConfig.highlightedIndex],
-      trace,
-    });
-    cameraRig.updateFishCamera(
-      simulation.fish[fishConfig.highlightedIndex],
-      simulationDt,
-    );
-  }
-
-  updateCoralIntro();
-  coralReef?.update();
-  aquariumEffects.update(simulationTime);
-  cameraRig.update();
-  cameraPanel.update();
-  renderer.render(scene, cameraRig.activeCamera);
+  manager.setCoralGrowth(0, 0, new Array(maxCount).fill(0));
 }
 
 function updateCoralIntro() {
-  if (!coralIntro || !coralReef) return;
+  if (!coralIntro) return;
 
   const progress = Math.min(
     1,
     (performance.now() - coralIntro.startedAt) / coralIntro.duration,
   );
-  // Reuse a persistent buffer; coralReef holds the reference until the intro
-  // ends (growth: null), and we overwrite every entry each frame.
   const growth = coralIntro.growthBuffer;
   let visibleCount = 0;
   for (let index = 0; index < growth.length; index += 1) {
@@ -576,20 +414,37 @@ function updateCoralIntro() {
     if (value > 0.001) visibleCount += 1;
   }
 
-  coralReef.rebuild({
-    count: visibleCount,
-    scale: coralIntro.targetScale,
-    growth,
-  });
+  manager.setCoralGrowth(visibleCount, coralIntro.targetScale, growth);
 
   if (progress >= 1) {
-    coralReef.rebuild({
-      count: coralIntro.targetCount,
-      scale: coralIntro.targetScale,
-      growth: null,
-    });
+    manager.setCoralGrowth(coralIntro.targetCount, coralIntro.targetScale, null);
     coralIntro = null;
   }
+}
+
+function animate() {
+  const frameDt = Math.min(clock.getDelta(), 1 / 30);
+  const simulationDt = getSimulationDelta(frameDt);
+
+  if (simulationDt > 0) {
+    simulationTime += simulationDt;
+    manager.update(simulationTime, simulationDt);
+
+    const cameraFish = manager.getCameraFish();
+    headingDebugger?.sample({
+      dt: simulationDt,
+      fish: cameraFish ?? undefined,
+      trace: null,
+    });
+    cameraRig.updateFishCamera(cameraFish, simulationDt);
+
+    queueFishSurfaceImpacts(cameraFish ? [cameraFish] : []);
+  }
+
+  updateCoralIntro();
+  cameraRig.update();
+  cameraPanel.update();
+  renderer.render(scene, cameraRig.activeCamera);
 }
 
 function getSimulationDelta(frameDt) {
@@ -745,7 +600,6 @@ function getRequiredElement(selector) {
 
 function getRequiredInput(selector) {
   const element = getRequiredElement(selector);
-
   if (!(element instanceof HTMLInputElement)) {
     throw new Error(`Expected ${selector} to be an input element.`);
   }

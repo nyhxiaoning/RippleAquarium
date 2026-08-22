@@ -135,6 +135,9 @@ function createBoidsSchool(
     getFish(index) {
       return sim.fish[index];
     },
+    setSettings(settings) {
+      Object.assign(sim.settings, settings);
+    },
     resize(halfSize) {
       sim.setBounds(halfSize);
     },
@@ -173,6 +176,19 @@ async function createCoralSchool(count: number, deps: SpeciesCreateDeps): Promis
     getCount() {
       return reef.count;
     },
+    setSettings({ count, scale }) {
+      reef.rebuild({
+        count: Number.isFinite(count) ? count : reef.count,
+        scale: Number.isFinite(scale) ? scale : reef.scale,
+        growth: null,
+      });
+    },
+    rebuildWithGrowth(count, scale, growth) {
+      reef.rebuild({ count, scale, growth });
+    },
+    getMaxCount() {
+      return reef.maxCount;
+    },
     resize(halfSize) {
       reef.resize(halfSize);
     },
@@ -208,10 +224,10 @@ function createStarfishSchool(count: number, deps: SpeciesCreateDeps): SchoolHan
 
   const tmpMatrix = new THREE.Matrix4();
   const tmpScale = new THREE.Vector3();
-  const floorY = deps.aquariumFloorY + 0.07;
-  const margin = 1.4;
 
   function update(_time, dt) {
+    const floorY = deps.aquariumFloorY + 0.07;
+    const margin = 1.4;
     for (const item of items) {
       if (item.index >= mesh.count) continue;
 
@@ -282,9 +298,9 @@ function createSeaweedSchool(count: number, deps: SpeciesCreateDeps): SchoolHand
   const tmpQuaternion = new THREE.Quaternion();
   const tmpScale = new THREE.Vector3();
   const tmpAxis = new THREE.Vector3(1, 0, 0);
-  const floorY = deps.aquariumFloorY + 0.02;
 
   function update(time) {
+    const floorY = deps.aquariumFloorY + 0.02;
     for (const item of items) {
       if (item.index >= mesh.count) continue;
 

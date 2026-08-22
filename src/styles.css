@@ -155,6 +155,86 @@ canvas {
   display: none;
 }
 
+.project-panel {
+  margin: 0 -4px 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgb(226 239 255 / 14%);
+}
+
+.project-panel h3 {
+  margin-top: 16px;
+}
+
+.style-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.style-chip {
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.style-chip.is-active {
+  background: #61d394;
+  color: #06231a;
+  border-color: #61d394;
+}
+
+.species-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.species-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+}
+
+.species-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #dce6ef;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.species-row input[type="range"] {
+  width: 100%;
+}
+
+.remove-btn {
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: rgb(124 78 84 / 78%);
+}
+
+.remove-btn:hover {
+  background: #7c4e56;
+}
+
+.add-select {
+  width: 100%;
+  margin-top: 8px;
+  min-height: 34px;
+  padding: 0 8px;
+  font-size: 13px;
+  color: #eef2f7;
+  background: #315a63;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 6px;
+}
+
 .panel-header {
   display: flex;
   align-items: center;

@@ -83,6 +83,12 @@ export interface SchoolHandle {
   rescalePositions?(halfSize: THREE.Vector3): void;
   /** Expose a member's state for the fish-view camera (schooling fish). */
   getFish?(index: number): FishState | undefined;
+  /** Update this school's tunable settings in place (boids behavior / coral). */
+  setSettings?(settings: Record<string, number>): void;
+  /** Rebuild the coral reef with an explicit per-coral growth array (intro anim). */
+  rebuildWithGrowth?(count: number, scale: number, growth: number[] | null): void;
+  /** Coral reef capacity (for the intro growth buffer). */
+  getMaxCount?(): number;
 }
 
 /** Dependencies handed to species factories so they can reuse existing loaders. */
@@ -119,23 +125,41 @@ export interface AquariumSceneHandle {
   getHalfSize(): THREE.Vector3;
   getWaterSurface(): { queueImpact(from: THREE.Vector3, to?: THREE.Vector3 | null): void; setSettings(settings: Record<string, number>): void };
   getFish(speciesId: string, index: number): FishState | undefined;
+  getLighting(): { setIntensity(multiplier: number): void };
+  setBoidsSettings(speciesId: string, settings: Record<string, number>): void;
+  setPlantSettings(speciesId: string, settings: { count?: number; scale?: number }): void;
+  setCoralGrowth(count: number, scale: number, growth: number[] | null): void;
+  getCoralMaxCount(): number;
+  refreshFishMeshes(): void;
 }
 
 export type ManagerEvent = "change";
 
 /** Public interface of the aquarium project manager. */
 export interface AquariumManager {
-  switchStyle(styleId: string): boolean;
+  switchStyle(styleId: string): Promise<boolean>;
   resize(size: Vec3): void;
   addFishSpecies(speciesId: string, count?: number): boolean;
   removeFishSpecies(speciesId: string): boolean;
   setFishCount(speciesId: string, count: number): boolean;
-  addPlantSpecies(speciesId: string, count?: number): boolean;
+  addPlantSpecies(speciesId: string, count?: number): Promise<boolean>;
   removePlantSpecies(speciesId: string): boolean;
   setPlantCount(speciesId: string, count: number): boolean;
   getDescriptor(): AquariumDescriptor;
   getStyleIds(): string[];
   getHalfSize(): Vec3;
+  getWaterLevelY(): number;
+  getWaterSurface(): { queueImpact(from: THREE.Vector3, to?: THREE.Vector3 | null): void; setSettings(settings: Record<string, number>): void };
+  getLighting(): { setIntensity(multiplier: number): void };
+  getCameraFish(): FishState | null;
+  setBoidsSettings(speciesId: string, settings: Record<string, number>): void;
+  setBoidsSpeedScale(speciesId: string, scale: number): void;
+  setPlantSettings(speciesId: string, settings: { count?: number; scale?: number }): void;
+  setCoralGrowth(count: number, scale: number, growth: number[] | null): void;
+  getCoralMaxCount(): number;
+  update(time: number, dt: number): void;
   on(event: ManagerEvent, callback: (descriptor: AquariumDescriptor) => void): () => void;
+  loadModels(): Promise<void>;
+  init(): Promise<void>;
   dispose(): void;
 }
