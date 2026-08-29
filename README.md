@@ -61,9 +61,9 @@
 
 ## 🚀 快速开始
 
-这是一个 TypeScript + Three.js ESM 项目，不依赖后端服务。Three.js 运行时已本地化到 `vendor/`，构建后的静态资源可直接由本地服务器或 GitHub Pages 托管。
+这是一个 TypeScript + Three.js + Vite 项目，不依赖后端服务。开发环境支持文件监听与热更新，生产构建可直接部署到 GitHub Pages。
 
-> 提示：由于使用了原生 ES Module，浏览器在 `file://` 协议下会拦截模块加载，因此需要通过本地 HTTP 服务器打开，不能直接双击 `index.html`。
+环境要求：Node.js `20.19+`、`22.12+` 或 `24+`（不支持奇数版 Node 23），npm 使用随受支持 Node.js 版本提供的版本即可。
 
 ### 1. 获取项目
 
@@ -72,34 +72,37 @@ git clone https://github.com/SeanWong17/RippleAquarium.git
 cd RippleAquarium
 ```
 
-### 2. 安装并构建
+### 2. 安装依赖
 
 ```bash
 npm install
-npm run build
 ```
 
-### 3. 本地运行
-
-建议使用本地静态服务器运行：
+### 3. 启动实时开发
 
 ```bash
-python3 -m http.server 8001
+npm run dev
 ```
 
-然后打开：
+打开终端输出的本地地址。Vite 会监听 TypeScript、CSS 与模型资源变化；CSS 会即时热更新，Three.js 模块修改后页面会自动刷新并重新初始化场景。
 
-```text
-http://127.0.0.1:8001/index.html
-```
-
-### 4. 运行测试（可选）
-
-模拟逻辑（boids 转向、避障射线、空间网格）带有单元测试，使用 Node 内置 test runner：
+### 4. 测试、类型检查与生产构建
 
 ```bash
 npm test
+npm run typecheck
+npm run build
 ```
+
+生产文件生成到 `dist/`。构建命令会先运行 TypeScript 类型检查，再执行 Vite 打包。
+
+### 5. 预览生产构建
+
+```bash
+npm run preview
+```
+
+打开终端输出的预览地址，验证实际 `dist/` 产物。
 
 ---
 
@@ -127,7 +130,8 @@ npm test
 | **鱼体运动** | 基于速度方向和姿态变化驱动鱼体朝向，锦鲤复用沙丁鱼行为逻辑并保留更粗胖的体型 |
 | **水面涟漪** | 使用水面网格高度场传播波动，支持鼠标与鱼体触发 |
 | **珊瑚生长** | 初始化阶段按统一成长进度驱动每个珊瑚从小到大生长 |
-| **依赖** | Three.js 运行时与 addons 本地化到 `vendor/`；TypeScript 与类型声明作为开发依赖安装 |
+| **工程化** | Vite 提供开发服务器、CSS 热更新、TypeScript/GLB 资源处理和生产构建；Vitest 直接运行 TypeScript 测试 |
+| **依赖** | Three.js 作为 npm 运行依赖；TypeScript、Vite、Vitest 与类型声明作为开发依赖 |
 | **国际化** | 轻量级前端 i18n 字典，界面文案可在中英文之间切换 |
 
 ### 项目结构
@@ -135,8 +139,8 @@ npm test
 ```text
 RippleAquarium/
 ├── assets/                 # README 演示动图
-├── vendor/three/           # 本地化的 Three.js 运行时与 addons
 ├── src/
+│   ├── aquarium/           # 水族箱配置、预设、场景构建与项目面板
 │   ├── fish/               # 鱼模型加载、姿态、变形、实例化渲染与空间网格
 │   ├── coral/              # 珊瑚模型资源
 │   ├── fish-school-simulation.ts
@@ -145,12 +149,12 @@ RippleAquarium/
 │   ├── clownfish-school.ts
 │   ├── i18n.ts
 │   └── main.ts
-├── scripts/                # 构建辅助脚本
-├── test/                   # 模拟逻辑单元测试（Node 内置 test runner）
-├── dist/                   # TypeScript 构建产物（本地生成，不提交）
+├── test/                   # Vitest 单元测试
+├── dist/                   # Vite 生产构建产物（本地生成，不提交）
 ├── index.html
 ├── package.json
 ├── tsconfig.json
+├── vite.config.ts
 ├── README.md
 ├── README.en.md
 └── LICENSE

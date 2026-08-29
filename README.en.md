@@ -61,9 +61,9 @@ A whole tank of fish swims on its own using boids flocking: they gather, turn, a
 
 ## 🚀 Quick Start
 
-This is a TypeScript + Three.js ESM project with no backend dependency. The Three.js runtime is vendored under `vendor/`, and the built static output can be served locally or deployed to GitHub Pages.
+This is a TypeScript + Three.js + Vite project with no backend dependency. The development environment watches files and supports hot updates, while the production build can be deployed directly to GitHub Pages.
 
-> Note: because the project uses native ES Modules, browsers block module loading over the `file://` protocol. Open it through a local HTTP server rather than double-clicking `index.html`.
+Requirements: Node.js `20.19+`, `22.12+`, or `24+` (odd-numbered Node 23 is not supported). Use the npm version bundled with a supported Node.js release.
 
 ### 1. Get the project
 
@@ -72,34 +72,37 @@ git clone https://github.com/SeanWong17/RippleAquarium.git
 cd RippleAquarium
 ```
 
-### 2. Install and build
+### 2. Install dependencies
 
 ```bash
 npm install
-npm run build
 ```
 
-### 3. Run locally
-
-Use a local static server:
+### 3. Start live development
 
 ```bash
-python3 -m http.server 8001
+npm run dev
 ```
 
-Then open:
+Open the local URL printed in the terminal. Vite watches TypeScript, CSS, and model assets; CSS updates immediately, while Three.js module changes reload the page and initialize a clean scene.
 
-```text
-http://127.0.0.1:8001/index.html
-```
-
-### 4. Run tests (optional)
-
-The simulation logic (boids steering, avoidance rays, spatial grid) ships with unit tests using Node's built-in test runner:
+### 4. Test, type-check, and build for production
 
 ```bash
 npm test
+npm run typecheck
+npm run build
 ```
+
+Production files are written to `dist/`. The build command runs the TypeScript type check before Vite bundles the application.
+
+### 5. Preview the production build
+
+```bash
+npm run preview
+```
+
+Open the preview URL printed in the terminal to verify the actual `dist/` output.
 
 ---
 
@@ -127,7 +130,8 @@ npm test
 | **Fish motion** | Fish orientation follows velocity and pose changes; koi reuse sardine behavior while keeping a thicker body shape |
 | **Ripples** | Water mesh height-field propagation with mouse-triggered and fish-triggered disturbance |
 | **Coral growth** | The initialization sequence drives each coral from small to full size |
-| **Dependencies** | The Three.js runtime and addons are vendored under `vendor/`; TypeScript and type declarations are installed as development dependencies |
+| **Tooling** | Vite provides the development server, CSS hot updates, TypeScript/GLB asset handling, and production builds; Vitest runs TypeScript tests directly |
+| **Dependencies** | Three.js is an npm runtime dependency; TypeScript, Vite, Vitest, and type declarations are development dependencies |
 | **i18n** | Lightweight frontend dictionary for Chinese/English UI text |
 
 ### Project Structure
@@ -135,8 +139,8 @@ npm test
 ```text
 RippleAquarium/
 ├── assets/                 # README demo GIF
-├── vendor/three/           # Vendored Three.js runtime and addons
 ├── src/
+│   ├── aquarium/           # Aquarium configuration, presets, scene building, and project panel
 │   ├── fish/               # Fish model loading, pose, deformation, instanced rendering, and spatial grid
 │   ├── coral/              # Coral model assets
 │   ├── fish-school-simulation.ts
@@ -145,12 +149,12 @@ RippleAquarium/
 │   ├── clownfish-school.ts
 │   ├── i18n.ts
 │   └── main.ts
-├── scripts/                # Build helper scripts
-├── test/                   # Simulation unit tests (Node built-in test runner)
-├── dist/                   # TypeScript build output (generated locally, not committed)
+├── test/                   # Vitest unit tests
+├── dist/                   # Vite production output (generated locally, not committed)
 ├── index.html
 ├── package.json
 ├── tsconfig.json
+├── vite.config.ts
 ├── README.md
 ├── README.en.md
 └── LICENSE
