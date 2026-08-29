@@ -1,5 +1,4 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { assert, test } from "vitest";
 import * as THREE from "three";
 import { FishSchoolSimulation } from "../src/fish-school-simulation.js";
 import { SpatialGrid } from "../src/fish/spatial-grid.js";
@@ -36,8 +35,8 @@ test("steerTowards returns zero for a zero input vector", () => {
   const sim = makeSimulation();
   const out = new THREE.Vector3(9, 9, 9);
   const result = sim.steerTowards(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0), out);
-  assert.equal(result, out, "writes into the provided output vector");
-  assert.equal(result.length(), 0);
+  assert.strictEqual(result, out, "writes into the provided output vector");
+  assert.strictEqual(result.length(), 0);
 });
 
 test("steerTowards is clamped by maxSteerForce", () => {
@@ -81,12 +80,12 @@ test("ray hits a box obstacle dead ahead and misses when pointing away", () => {
     size: new THREE.Vector3(2, 2, 2),
   };
   const origin = new THREE.Vector3(0, 0, 0);
-  assert.equal(
+  assert.strictEqual(
     sim.rayHitsSingleObstacle(origin, new THREE.Vector3(0, 0, 1), 10, obstacle),
     true,
     "ray toward the box hits",
   );
-  assert.equal(
+  assert.strictEqual(
     sim.rayHitsSingleObstacle(origin, new THREE.Vector3(0, 0, -1), 10, obstacle),
     false,
     "ray away from the box misses",
@@ -97,11 +96,11 @@ test("ray hits a sphere obstacle dead ahead and misses when pointing away", () =
   const sim = makeSimulation();
   const obstacle = { position: new THREE.Vector3(0, 0, 5), radius: 1 };
   const origin = new THREE.Vector3(0, 0, 0);
-  assert.equal(
+  assert.strictEqual(
     sim.rayHitsSingleObstacle(origin, new THREE.Vector3(0, 0, 1), 10, obstacle),
     true,
   );
-  assert.equal(
+  assert.strictEqual(
     sim.rayHitsSingleObstacle(origin, new THREE.Vector3(0, 0, -1), 10, obstacle),
     false,
   );

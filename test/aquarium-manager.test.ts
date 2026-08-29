@@ -1,5 +1,4 @@
-import { describe, it, beforeEach } from "node:test";
-import assert from "node:assert/strict";
+import { assert, beforeEach, describe, it } from "vitest";
 import { aquariumHalfSize, pineappleHouseDecor, spongebobPatrickDecor } from "../src/config.js";
 import {
   DEFAULT_STYLE,
