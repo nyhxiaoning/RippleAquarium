@@ -69,7 +69,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 - 保持默认输出目录 `dist/`；
 - 测试使用 Node 环境并匹配 `test/**/*.test.ts`。
 
-项目最低运行环境为 Node.js `20.19+` 或 `22.12+`，CI 固定使用 Node 22。
+项目支持 Node.js `^20.19.0`、`^22.12.0` 或 `>=24.0.0`，CI 固定使用 Node 22。奇数版 Node 23 不在 Vitest 4 的正式支持范围内。
 
 ## npm 命令
 
