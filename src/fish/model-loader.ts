@@ -205,8 +205,8 @@ vec3 readFishAppearanceColor(vec3 baseColor, vec3 localPosition) {
     float patchA = smoothstep(0.34, 0.0, length(localPosition.xy - vec2(0.02, 0.36)));
     float patchB = smoothstep(0.30, 0.0, length(localPosition.xy - vec2(-0.10, -0.02)));
     float patchC = smoothstep(0.25, 0.0, length(localPosition.xy - vec2(0.08, -0.36)));
-    float patch = clamp(max(max(patchA, patchB), patchC), 0.0, 1.0);
-    return mix(mix(white, warmShadow, dorsal * 0.26), red, patch);
+    float koiPatch = clamp(max(max(patchA, patchB), patchC), 0.0, 1.0);
+    return mix(mix(white, warmShadow, dorsal * 0.26), red, koiPatch);
   }
 
   float variant = 0.0;
