@@ -1,3 +1,4 @@
+import "./styles.css";
 import * as THREE from "three";
 import { DEFAULT_STYLE } from "./aquarium/presets.js";
 import { createAquariumManager } from "./aquarium/manager.js";
