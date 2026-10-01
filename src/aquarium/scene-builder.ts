@@ -3,7 +3,7 @@ import { pineappleHouseDecor, simulationSettings } from "../config.js";
 import { addLighting, addObstacles, createAquariumShell } from "../scene-setup.js";
 import { createPineappleHouseDecor } from "../decor/pineapple-house.js";
 import { createSpongebobPatrickDecor } from "../decor/spongebob-patrick.js";
-import { createFishSchool, createPlantSchool } from "./species-catalog.js";
+import { createFishSchool, createPlantSchool, getFishMeta } from "./species-catalog.js";
 import { createEcologySchool } from "../ecology/catalog.js";
 import type { EcologyEntry, EcologyKind } from "../ecology/types.js";
 import { createHabitatLayout } from "./habitat.js";
@@ -122,6 +122,7 @@ export async function buildAquariumScene(
 
   const exclusionZones = computeExclusionZones(descriptor.decor);
   const clownfishAvoidanceZones = computeClownfishAvoidanceZones(descriptor.decor);
+  let habitatLayout = createHabitatLayout({ x: halfSize.x, y: halfSize.y, z: halfSize.z });
 
   const speciesDeps: SpeciesCreateDeps = {
     scene: root,
@@ -135,12 +136,13 @@ export async function buildAquariumScene(
     settings: { ...simulationSettings },
     seed: 73,
     growthRegistry,
+    habitatLayout,
   };
   const ecologyDeps = {
     aquariumHalfSize: halfSize,
     waterLevelY,
     aquariumFloorY,
-    habitat: createHabitatLayout(descriptor.aquarium.halfSize),
+    habitat: habitatLayout,
     seed: 73,
   };
 
@@ -246,10 +248,16 @@ export async function buildAquariumScene(
     speciesDeps.aquariumFloorY = aquariumFloorY;
     ecologyDeps.waterLevelY = waterLevelY;
     ecologyDeps.aquariumFloorY = aquariumFloorY;
-    ecologyDeps.habitat = createHabitatLayout({ x: halfSize.x, y: halfSize.y, z: halfSize.z });
+    habitatLayout = createHabitatLayout({ x: halfSize.x, y: halfSize.y, z: halfSize.z });
+    speciesDeps.habitatLayout = habitatLayout;
+    ecologyDeps.habitat = habitatLayout;
     lighting.resize?.(halfSize);
     shell.resize(halfSize);
-    for (const school of fishSchools.values()) {
+    for (const entry of descriptor.fish) {
+      const school = fishSchools.get(entry.speciesId);
+      if (!school) continue;
+      const layer = getFishMeta(entry.speciesId)?.habitatLayer;
+      school.setAllowedRegion?.(layer ? habitatLayout[layer] : undefined);
       school.resize?.(halfSize);
       school.rescalePositions?.(halfSize);
     }

@@ -19,11 +19,14 @@ import type {
   RandomSource,
   SimulationSettings,
 } from "./types.js";
+import type { HabitatRegion } from "./aquarium/habitat.js";
 
-interface FishSchoolSimulationOptions {
+export interface FishSchoolSimulationOptions {
   aquariumHalfSize: THREE.Vector3;
   obstacles: Obstacle[];
   settings: SimulationSettings;
+  /** Optional spatial habitat restriction for this school. */
+  allowedRegion?: HabitatRegion;
 }
 
 interface UpdateOptions {
@@ -32,6 +35,7 @@ interface UpdateOptions {
 
 export class FishSchoolSimulation {
   aquariumHalfSize: THREE.Vector3;
+  allowedRegion?: HabitatRegion;
   obstacles: Obstacle[];
   settings: SimulationSettings;
   fish: FishState[];
@@ -62,8 +66,9 @@ export class FishSchoolSimulation {
   tmpQuat: THREE.Quaternion;
   forwardAxis: THREE.Vector3;
 
-  constructor({ aquariumHalfSize, obstacles, settings }: FishSchoolSimulationOptions) {
+  constructor({ aquariumHalfSize, obstacles, settings, allowedRegion }: FishSchoolSimulationOptions) {
     this.aquariumHalfSize = aquariumHalfSize;
+    this.allowedRegion = allowedRegion;
     this.obstacles = obstacles;
     this.settings = settings;
     this.fish = [];
@@ -141,10 +146,36 @@ export class FishSchoolSimulation {
   /** Point the simulation at a live, mutable bounds vector (owned by AquariumManager). */
   setBounds(halfSize: THREE.Vector3): void {
     this.aquariumHalfSize = halfSize;
+    this.clampPositions();
+  }
+
+  /**
+   * Restrict this school to a habitat region. Existing fish are moved inside
+   * the new region immediately so a resize or a layer change cannot leave a
+   * member stranded outside its allowed water column.
+   */
+  setAllowedRegion(region?: HabitatRegion): void {
+    this.allowedRegion = region;
+    this.clampPositions();
+  }
+
+  /** Clamp all current members to the active tank/region bounds. */
+  clampPositions(margin = this.settings.boundsRadius): void {
+    const bounds = this.regionBounds();
+    const xMargin = Math.min(Math.max(0, margin), Math.max(0, (bounds.maxX - bounds.minX) * 0.5));
+    const yMargin = Math.min(Math.max(0, margin), Math.max(0, (bounds.maxY - bounds.minY) * 0.5));
+    const zMargin = Math.min(Math.max(0, margin), Math.max(0, (bounds.maxZ - bounds.minZ) * 0.5));
+    for (const fish of this.fish) {
+      fish.position.x = THREE.MathUtils.clamp(fish.position.x, bounds.minX + xMargin, bounds.maxX - xMargin);
+      fish.position.y = THREE.MathUtils.clamp(fish.position.y, bounds.minY + yMargin, bounds.maxY - yMargin);
+      fish.position.z = THREE.MathUtils.clamp(fish.position.z, bounds.minZ + zMargin, bounds.maxZ - zMargin);
+    }
   }
 
   createFish(index = this.fish.length, fishId?: string): FishState {
-    const position = randomPointInAquarium(this.random, this.aquariumHalfSize, 0.62);
+    const position = this.allowedRegion
+      ? this.sampleAllowedRegion(0.62)
+      : randomPointInAquarium(this.random, this.aquariumHalfSize, 0.62);
     const direction = randomPointInSphere(this.random, 1).normalize();
     const speed = THREE.MathUtils.lerp(
       this.settings.minSpeed,
@@ -162,6 +193,50 @@ export class FishSchoolSimulation {
 
   createMotionState(index = this.fish.length) {
     return createFishMotionState(index);
+  }
+
+  private sampleAllowedRegion(margin: number): THREE.Vector3 {
+    if (!this.allowedRegion) return randomPointInAquarium(this.random, this.aquariumHalfSize, margin);
+    const bounds = this.regionBounds();
+    const sampleAxis = (min: number, max: number): number => {
+      const inset = Math.max(0, Math.min(margin, (max - min) * 0.5));
+      const low = min + inset;
+      const high = max - inset;
+      return low >= high ? (min + max) * 0.5 : low + (high - low) * this.random();
+    };
+    return new THREE.Vector3(
+      sampleAxis(bounds.minX, bounds.maxX),
+      sampleAxis(bounds.minY, bounds.maxY),
+      sampleAxis(bounds.minZ, bounds.maxZ),
+    );
+  }
+
+  private regionBounds() {
+    const region = this.allowedRegion;
+    const regionMinX = region?.min.x ?? -this.aquariumHalfSize.x;
+    const regionMaxX = region?.max.x ?? this.aquariumHalfSize.x;
+    const regionMinY = region?.min.y ?? -this.aquariumHalfSize.y;
+    const regionMaxY = region?.max.y ?? this.aquariumHalfSize.y;
+    const regionMinZ = region?.min.z ?? -this.aquariumHalfSize.z;
+    const regionMaxZ = region?.max.z ?? this.aquariumHalfSize.z;
+    return {
+      minX: Math.max(-this.aquariumHalfSize.x, regionMinX),
+      maxX: Math.min(this.aquariumHalfSize.x, regionMaxX),
+      minY: Math.max(-this.aquariumHalfSize.y, regionMinY),
+      maxY: Math.min(this.aquariumHalfSize.y, regionMaxY),
+      minZ: Math.max(-this.aquariumHalfSize.z, regionMinZ),
+      maxZ: Math.min(this.aquariumHalfSize.z, regionMaxZ),
+    };
+  }
+
+  private clampPoint(point: THREE.Vector3, margin = 0): void {
+    const bounds = this.regionBounds();
+    const xMargin = Math.min(Math.max(0, margin), Math.max(0, (bounds.maxX - bounds.minX) * 0.5));
+    const yMargin = Math.min(Math.max(0, margin), Math.max(0, (bounds.maxY - bounds.minY) * 0.5));
+    const zMargin = Math.min(Math.max(0, margin), Math.max(0, (bounds.maxZ - bounds.minZ) * 0.5));
+    point.x = THREE.MathUtils.clamp(point.x, bounds.minX + xMargin, bounds.maxX - xMargin);
+    point.y = THREE.MathUtils.clamp(point.y, bounds.minY + yMargin, bounds.maxY - yMargin);
+    point.z = THREE.MathUtils.clamp(point.z, bounds.minZ + zMargin, bounds.maxZ - zMargin);
   }
 
   ensureBuffers(count: number): void {
@@ -281,6 +356,7 @@ export class FishSchoolSimulation {
       const velocity = this.limitTurn(fish.velocity, desiredVelocity, dt, nextVelocity);
 
       nextPosition.copy(fish.position).addScaledVector(velocity, dt);
+      this.clampPoint(nextPosition, this.settings.boundsRadius);
 
       if (components) {
         trace = {
@@ -477,44 +553,58 @@ export class FishSchoolSimulation {
     const horizontalMargin = this.settings.horizontalBoundaryMargin ?? this.settings.boundaryMargin;
     const topMargin = this.settings.topBoundaryMargin ?? this.settings.boundaryMargin;
     const bottomMargin = this.settings.bottomBoundaryMargin ?? this.settings.boundaryMargin;
+    const bounds = this.regionBounds();
 
     for (const axis of ["x", "z"] as const) {
-      const innerLimit = this.aquariumHalfSize[axis] - horizontalMargin;
+      const min = axis === "x" ? bounds.minX : bounds.minZ;
+      const max = axis === "x" ? bounds.maxX : bounds.maxZ;
+      const margin = Math.min(horizontalMargin, Math.max(0, (max - min) * 0.5));
+      const innerMin = min + margin;
+      const innerMax = max - margin;
 
-      if (position[axis] > innerLimit) {
-        steer[axis] -= (position[axis] - innerLimit) / horizontalMargin;
-      } else if (position[axis] < -innerLimit) {
-        steer[axis] += (-innerLimit - position[axis]) / horizontalMargin;
+      if (position[axis] > innerMax) {
+        steer[axis] -= (position[axis] - innerMax) / Math.max(margin, 0.000001);
+      } else if (position[axis] < innerMin) {
+        steer[axis] += (innerMin - position[axis]) / Math.max(margin, 0.000001);
       }
     }
 
-    const topInnerLimit = this.aquariumHalfSize.y - topMargin;
-    const bottomInnerLimit = -this.aquariumHalfSize.y + bottomMargin;
+    const topInset = Math.min(topMargin, Math.max(0, (bounds.maxY - bounds.minY) * 0.5));
+    const bottomInset = Math.min(bottomMargin, Math.max(0, (bounds.maxY - bounds.minY) * 0.5));
+    const topInnerLimit = bounds.maxY - topInset;
+    const bottomInnerLimit = bounds.minY + bottomInset;
     if (position.y > topInnerLimit) {
-      steer.y -= (position.y - topInnerLimit) / topMargin;
+      steer.y -= (position.y - topInnerLimit) / Math.max(topInset, 0.000001);
     } else if (position.y < bottomInnerLimit) {
-      steer.y += (bottomInnerLimit - position.y) / bottomMargin;
+      steer.y += (bottomInnerLimit - position.y) / Math.max(bottomInset, 0.000001);
     }
 
     return steer;
   }
 
   isInsideAquarium(point: THREE.Vector3, inset = 0): boolean {
+    const bounds = this.regionBounds();
     return (
-      Math.abs(point.x) <= this.aquariumHalfSize.x - inset &&
-      Math.abs(point.y) <= this.aquariumHalfSize.y - inset &&
-      Math.abs(point.z) <= this.aquariumHalfSize.z - inset
+      point.x >= bounds.minX + inset &&
+      point.x <= bounds.maxX - inset &&
+      point.y >= bounds.minY + inset &&
+      point.y <= bounds.maxY - inset &&
+      point.z >= bounds.minZ + inset &&
+      point.z <= bounds.maxZ - inset
     );
   }
 
   isInsidePredictedAquarium(point: THREE.Vector3, inset = 0): boolean {
+    const bounds = this.regionBounds();
     const topInset = Math.min(inset, this.settings.topBoundaryMargin ?? inset);
 
     return (
-      Math.abs(point.x) <= this.aquariumHalfSize.x - inset &&
-      point.y <= this.aquariumHalfSize.y - topInset &&
-      point.y >= -this.aquariumHalfSize.y + inset &&
-      Math.abs(point.z) <= this.aquariumHalfSize.z - inset
+      point.x >= bounds.minX + inset &&
+      point.x <= bounds.maxX - inset &&
+      point.y <= bounds.maxY - topInset &&
+      point.y >= bounds.minY + inset &&
+      point.z >= bounds.minZ + inset &&
+      point.z <= bounds.maxZ - inset
     );
   }
 }

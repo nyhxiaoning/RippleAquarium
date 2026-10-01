@@ -12,7 +12,7 @@ import type {
   SchoolHandle,
   SpeciesCreateDeps,
 } from "./types.js";
-import type { HabitatLayer } from "./habitat.js";
+import { createHabitatLayout, type HabitatLayer, type HabitatRegion } from "./habitat.js";
 
 export interface FishCatalogEntry {
   id: string;
@@ -130,10 +130,16 @@ function createBoidsSchool(
   fishIds: readonly string[] = [],
 ): SchoolHandle {
   const settings = { ...deps.settings };
+  const entry = getFishMeta(speciesId);
+  const habitatLayout = deps.habitatLayout ?? createHabitatLayout(deps.aquariumHalfSize);
+  const allowedRegion: HabitatRegion | undefined = entry?.habitatLayer
+    ? habitatLayout[entry.habitatLayer]
+    : undefined;
   const sim = new FishSchoolSimulation({
     aquariumHalfSize: deps.aquariumHalfSize,
     obstacles: deps.obstacles,
     settings,
+    allowedRegion,
   });
   sim.reset(count, 42, fishIds);
 
@@ -176,13 +182,16 @@ function createBoidsSchool(
     resize(halfSize) {
       sim.setBounds(halfSize);
     },
+    setAllowedRegion(region) {
+      sim.setAllowedRegion(region);
+      updateFishInstances(mesh, sim.fish, growthSizes);
+    },
     rescalePositions(halfSize) {
-      const margin = 0.6;
-      for (const fish of sim.fish) {
-        fish.position.x = THREE.MathUtils.clamp(fish.position.x, -halfSize.x + margin, halfSize.x - margin);
-        fish.position.y = THREE.MathUtils.clamp(fish.position.y, -halfSize.y + margin, halfSize.y - margin);
-        fish.position.z = THREE.MathUtils.clamp(fish.position.z, -halfSize.z + margin, halfSize.z - margin);
-      }
+      // FishSchoolSimulation owns both the tank bounds and optional habitat
+      // region; use its shared clamp so a resize cannot leak a fish out of its
+      // layer. The argument is retained for the SchoolHandle contract.
+      void halfSize;
+      sim.clampPositions(0.6);
       updateFishInstances(mesh, sim.fish, growthSizes);
     },
   };

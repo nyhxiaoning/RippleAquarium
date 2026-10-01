@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { ExclusionZone, FishState, Obstacle, SimulationSettings } from "../types.js";
 import type { FishGrowthRegistry } from "../growth/registry.js";
 import type { EcologyEntry, EcologyKind } from "../ecology/types.js";
-import type { HabitatLayer } from "./habitat.js";
+import type { HabitatLayer, HabitatRegion } from "./habitat.js";
 
 /** Plain serializable 3D vector (no Three.js dependency for presets/tests). */
 export interface Vec3 {
@@ -95,6 +95,8 @@ export interface SchoolHandle {
   reef?: CoralReefLike;
   /** Clamp member positions into new bounds after a resize (schooling fish). */
   rescalePositions?(halfSize: THREE.Vector3): void;
+  /** Update the spatial region used by a schooling fish simulation. */
+  setAllowedRegion?(region?: HabitatRegion): void;
   /** Expose a member's state for the fish-view camera (schooling fish). */
   getFish?(index: number): FishState | undefined;
   /** Update this school's tunable settings in place (boids behavior / coral). */
@@ -118,6 +120,8 @@ export interface SpeciesCreateDeps {
   settings: SimulationSettings;
   seed: number;
   growthRegistry: FishGrowthRegistry;
+  /** Shared spatial layout for the current aquarium size. */
+  habitatLayout?: Readonly<Record<HabitatLayer, HabitatRegion>>;
 }
 
 /** Live handle for one fully-built aquarium scene. Owned by the manager. */
