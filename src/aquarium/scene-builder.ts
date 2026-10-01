@@ -96,9 +96,9 @@ function computeClownfishAvoidanceZones(decor: AquariumDescriptor["decor"]): Exc
 
 export async function buildAquariumScene(
   descriptor: AquariumDescriptor,
-  deps: { renderer: THREE.WebGLRenderer; scene: THREE.Scene },
+  deps: { renderer: THREE.WebGLRenderer; scene: THREE.Scene; growthRegistry: import("../growth/registry.js").FishGrowthRegistry },
 ): Promise<AquariumSceneHandle> {
-  const { renderer, scene } = deps;
+  const { renderer, scene, growthRegistry } = deps;
   const root = new THREE.Group();
   root.name = `Aquarium-${descriptor.id}`;
 
@@ -131,6 +131,7 @@ export async function buildAquariumScene(
     clownfishAvoidanceZones,
     settings: { ...simulationSettings },
     seed: 73,
+    growthRegistry,
   };
 
   const fishSchools = new Map<string, SchoolHandle>();
@@ -200,8 +201,11 @@ export async function buildAquariumScene(
   scene.add(root);
 
   function update(time: number, dt: number) {
+    if (dt > 0) growthRegistry.advanceOnline(dt);
     for (const school of fishSchools.values()) {
       school.update(time, dt);
+      const ids = school.getFishIds();
+      school.setGrowthSizes(ids.map((id) => growthRegistry.getRecord(id)?.sizeMultiplier ?? 1));
     }
     for (const school of plantSchools.values()) {
       school.update(time, dt);
@@ -226,7 +230,12 @@ export async function buildAquariumScene(
   }
 
   function setFishCount(speciesId: string, count: number) {
-    fishSchools.get(speciesId)?.setCount(count);
+    const school = fishSchools.get(speciesId);
+    school?.setCount(count);
+    if (school) {
+      const ids = school.getFishIds();
+      school.setGrowthSizes(ids.map((id) => growthRegistry.getRecord(id)?.sizeMultiplier ?? 1));
+    }
   }
 
   function setPlantCount(speciesId: string, count: number) {

@@ -58,27 +58,31 @@ export function createFishSchool(
   deps: SpeciesCreateDeps,
   ctx: CreateContext = {},
 ): SchoolHandle | null {
+  const fishIds = deps.growthRegistry
+    .getRecords(speciesId)
+    .map((record) => record.fishId)
+    .slice(0, Math.max(0, Math.floor(count)));
   switch (speciesId) {
     case "sardine":
-      return createBoidsSchool("cartoon", count, deps, 260);
+      return createBoidsSchool("cartoon", "sardine", count, deps, 260, fishIds);
     case "koi":
-      return createBoidsSchool("koi", count, deps, 120);
+      return createBoidsSchool("koi", "koi", count, deps, 120, fishIds);
     case "clownfish": {
       const reef = ctx.coralReef?.reef;
       if (!reef) return null;
-      const school = createClownfishSchool(reef, { count, avoidanceZones: deps.clownfishAvoidanceZones });
+      const school = createClownfishSchool(reef, { count, fishIds, avoidanceZones: deps.clownfishAvoidanceZones });
       return {
         group: school.mesh,
         update: (_time, dt) => school.update(_time, dt),
         dispose: () => school.dispose(),
-        setCount: (n) => school.setCount(n),
+        setCount: (n, ids) => school.setCount(n, ids),
         getCount: () => school.mesh.count,
         getFishIds: () => school.getFishIds(),
         setGrowthSizes: (sizes) => school.setGrowthSizes(sizes),
       };
     }
     case "starfish":
-      return createStarfishSchool(count, deps);
+      return createStarfishSchool(count, deps, fishIds);
     default:
       return null;
   }
@@ -101,9 +105,11 @@ export async function createPlantSchool(
 
 function createBoidsSchool(
   modelKey: string,
+  speciesId: string,
   count: number,
   deps: SpeciesCreateDeps,
   capacity: number,
+  fishIds: readonly string[] = [],
 ): SchoolHandle {
   const settings = { ...deps.settings };
   const sim = new FishSchoolSimulation({
@@ -111,7 +117,7 @@ function createBoidsSchool(
     obstacles: deps.obstacles,
     settings,
   });
-  sim.reset(count);
+  sim.reset(count, 42, fishIds);
 
   const mesh = createFishMeshByKey(capacity, modelKey);
   setFishMeshCount(mesh, sim.fish.length);
@@ -128,7 +134,8 @@ function createBoidsSchool(
       disposeFishMesh(mesh);
     },
     setCount(n) {
-      sim.setCount(n);
+      const ids = deps.growthRegistry.getRecords(speciesId).map((record) => record.fishId);
+      sim.setCount(n, ids);
       setFishMeshCount(mesh, sim.fish.length);
       updateFishInstances(mesh, sim.fish, growthSizes);
     },
@@ -209,7 +216,7 @@ async function createCoralSchool(count: number, deps: SpeciesCreateDeps): Promis
   };
 }
 
-function createStarfishSchool(count: number, deps: SpeciesCreateDeps): SchoolHandle {
+function createStarfishSchool(count: number, deps: SpeciesCreateDeps, fishIds: readonly string[] = []): SchoolHandle {
   const MAX = 30;
   const geometry = createStarfishGeometry();
   const material = new THREE.MeshStandardMaterial({
@@ -225,7 +232,7 @@ function createStarfishSchool(count: number, deps: SpeciesCreateDeps): SchoolHan
   mesh.castShadow = true;
   mesh.receiveShadow = true;
 
-  const items = Array.from({ length: MAX }, (_, index) => {
+  let items = Array.from({ length: MAX }, (_, index) => {
     const position = sampleBottomPosition(deps, index);
     return {
       index,
@@ -233,7 +240,7 @@ function createStarfishSchool(count: number, deps: SpeciesCreateDeps): SchoolHan
       velocity: new THREE.Vector3((Math.random() - 0.5) * 0.4, 0, (Math.random() - 0.5) * 0.4),
       phase: Math.random() * Math.PI * 2,
       size: THREE.MathUtils.lerp(0.5, 0.85, Math.random()),
-      fishId: `starfish-${index}`,
+      fishId: fishIds[index] ?? `starfish-${index}`,
     };
   });
 
@@ -273,7 +280,15 @@ function createStarfishSchool(count: number, deps: SpeciesCreateDeps): SchoolHan
       geometry.dispose();
       material.dispose();
     },
-    setCount(n) {
+    setCount(n, fishIds) {
+      fishIds = fishIds ?? deps.growthRegistry.getRecords("starfish").map((record) => record.fishId);
+      if (fishIds) {
+        const byId = new Map(items.map((item) => [item.fishId, item]));
+        const ordered = fishIds.map((id) => byId.get(id)).filter((item): item is (typeof items)[number] => Boolean(item));
+        const remaining = items.filter((item) => !fishIds.includes(item.fishId));
+        items = [...ordered, ...remaining];
+        items.forEach((item, index) => { item.index = index; });
+      }
       mesh.count = THREE.MathUtils.clamp(Math.floor(n), 0, MAX);
     },
     getCount() {

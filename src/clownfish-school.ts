@@ -58,7 +58,7 @@ export function createClownfishSchool(
   );
 
   const random = mulberry32(seed);
-  const fish = Array.from({ length: maxCount }, (_, index) =>
+  let fish = Array.from({ length: maxCount }, (_, index) =>
     createClownfish(index, random, avoidanceZones, fishIds?.[index]),
   );
   const growthSizes = new Array<number>(maxCount).fill(1);
@@ -89,7 +89,14 @@ export function createClownfishSchool(
     mesh,
     update,
     dispose,
-    setCount(nextCount) {
+    setCount(nextCount, fishIds) {
+      if (fishIds) {
+        const byId = new Map(fish.map((item) => [item.fishId, item]));
+        const ordered = fishIds.map((id) => byId.get(id)).filter((item): item is (typeof fish)[number] => Boolean(item));
+        const remaining = fish.filter((item) => !fishIds.includes(item.fishId));
+        fish = [...ordered, ...remaining];
+        fish.forEach((item, index) => { item.index = index; });
+      }
       mesh.count = normalizeCount(nextCount);
     },
     getFishIds() {

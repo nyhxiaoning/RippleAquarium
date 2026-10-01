@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { ExclusionZone, FishState, Obstacle, SimulationSettings } from "../types.js";
+import type { FishGrowthRegistry } from "../growth/registry.js";
 
 /** Plain serializable 3D vector (no Three.js dependency for presets/tests). */
 export interface Vec3 {
@@ -74,7 +75,7 @@ export interface SchoolHandle {
   group: THREE.Object3D;
   update(time: number, dt: number): void;
   dispose(): void;
-  setCount(n: number): void;
+  setCount(n: number, fishIds?: readonly string[]): void;
   getCount(): number;
   getFishIds(): string[];
   setGrowthSizes(sizes: readonly number[]): void;
@@ -105,6 +106,7 @@ export interface SpeciesCreateDeps {
   clownfishAvoidanceZones: ExclusionZone[];
   settings: SimulationSettings;
   seed: number;
+  growthRegistry: FishGrowthRegistry;
 }
 
 /** Live handle for one fully-built aquarium scene. Owned by the manager. */
@@ -164,4 +166,6 @@ export interface AquariumManager {
   loadModels(): Promise<void>;
   init(): Promise<void>;
   dispose(): void;
+  getGrowthRegistry(): FishGrowthRegistry;
+  getGrowthStats(speciesId?: string): import("../growth/types.js").GrowthStats;
 }

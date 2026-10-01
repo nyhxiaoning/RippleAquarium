@@ -4,6 +4,7 @@ import { loadFishModel } from "../fish-renderer.js";
 import { getFishMeta, getPlantMeta } from "./species-catalog.js";
 import { getStyleById, listStyleIds } from "./presets.js";
 import { buildAquariumScene } from "./scene-builder.js";
+import { createFishGrowthRegistry } from "../growth/registry.js";
 import type {
   AquariumDescriptor,
   AquariumManager,
@@ -60,6 +61,8 @@ export function createAquariumManager(
   // Work on a private copy so adjusting counts never mutates the shared preset.
   let descriptor = cloneDescriptor(initialDescriptor);
   let handle: AquariumSceneHandle | null = null;
+  const growthRegistry = createFishGrowthRegistry();
+  for (const entry of descriptor.fish) growthRegistry.activate(entry.speciesId, entry.count);
   const listeners = new Set<(descriptor: AquariumDescriptor) => void>();
 
   function notify() {
@@ -71,7 +74,7 @@ export function createAquariumManager(
       scene.remove(handle.root);
       handle.dispose();
     }
-    handle = await buildAquariumScene(descriptor, { renderer, scene });
+    handle = await buildAquariumScene(descriptor, { renderer, scene, growthRegistry });
     cameraRig.configure(
       new THREE.Vector3(
         descriptor.aquarium.halfSize.x,
@@ -109,7 +112,8 @@ export function createAquariumManager(
     },
     getCoralMaxCount: () => handle!.getCoralMaxCount(),
     update(time, dt) {
-      handle?.update(time, dt);
+      if (handle) handle.update(time, dt);
+      else if (dt > 0) growthRegistry.advanceOnline(dt);
     },
     on(event, cb) {
       if (event !== "change") return () => {};
@@ -119,6 +123,16 @@ export function createAquariumManager(
     async switchStyle(styleId) {
       const style = getStyleById(styleId);
       if (!style) return false;
+      const previous = new Map(descriptor.fish.map((entry) => [entry.speciesId, entry.count]));
+      const nextSpecies = new Set(style.fish.map((entry) => entry.speciesId));
+      for (const entry of descriptor.fish) {
+        if (!nextSpecies.has(entry.speciesId)) growthRegistry.deactivate(entry.speciesId, entry.count);
+      }
+      for (const entry of style.fish) {
+        const current = previous.get(entry.speciesId) ?? 0;
+        if (entry.count > current) growthRegistry.activate(entry.speciesId, entry.count - current);
+        else if (entry.count < current) growthRegistry.deactivate(entry.speciesId, current - entry.count);
+      }
       descriptor = cloneDescriptor(style);
       await rebuild();
       return true;
@@ -146,6 +160,9 @@ export function createAquariumManager(
     setFishCount(speciesId, count) {
       const entry = descriptor.fish.find((f) => f.speciesId === speciesId);
       if (!entry) return false;
+      const previous = entry.count;
+      if (count > previous) growthRegistry.activate(speciesId, count - previous);
+      else if (count < previous) growthRegistry.deactivate(speciesId, previous - count);
       entry.count = count;
       handle?.setFishCount(speciesId, count);
       notify();
@@ -154,7 +171,10 @@ export function createAquariumManager(
     addFishSpecies(speciesId, count) {
       const meta = getFishMeta(speciesId);
       if (!meta || descriptor.fish.some((f) => f.speciesId === speciesId)) return false;
-      const school = handle?.addFishSpecies(speciesId, count ?? meta.defaultCount);
+      if (!handle) return false;
+      const requested = count ?? meta.defaultCount;
+      growthRegistry.activate(speciesId, requested);
+      const school = handle.addFishSpecies(speciesId, requested);
       if (!school) return false;
       descriptor = { ...descriptor, fish: [...descriptor.fish, { speciesId, count: school.getCount() }] };
       notify();
@@ -162,6 +182,8 @@ export function createAquariumManager(
     },
     removeFishSpecies(speciesId) {
       if (!descriptor.fish.some((f) => f.speciesId === speciesId)) return false;
+      const entry = descriptor.fish.find((f) => f.speciesId === speciesId);
+      if (entry) growthRegistry.deactivate(speciesId, entry.count);
       handle?.removeFishSpecies(speciesId);
       descriptor = { ...descriptor, fish: descriptor.fish.filter((f) => f.speciesId !== speciesId) };
       notify();
@@ -206,5 +228,7 @@ export function createAquariumManager(
       handle = null;
       listeners.clear();
     },
+    getGrowthRegistry: () => growthRegistry,
+    getGrowthStats: (speciesId) => growthRegistry.getStats(speciesId),
   };
 }
