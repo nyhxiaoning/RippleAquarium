@@ -13,6 +13,12 @@ import type {
   SchoolHandle,
   SpeciesCreateDeps,
 } from "./types.js";
+import type { ThemeEntry } from "../theme/types.js";
+import {
+  getThemeAvoidanceZone,
+  getThemePropCollision,
+  getThemePropFootprint,
+} from "../theme/props.js";
 import type { ExclusionZone, Obstacle } from "../types.js";
 import { getWeatherEffects } from "../weather/effects.js";
 import type { WeatherEffects, WeatherState } from "../weather/types.js";
@@ -27,11 +33,15 @@ function findDecor(decor: AquariumDescriptor["decor"], asset: string) {
   return decor.find((item) => item.asset === asset);
 }
 
-function computeObstacles(decor: AquariumDescriptor["decor"], halfSize: THREE.Vector3): Obstacle[] {
+export function computeObstacles(
+  decor: AquariumDescriptor["decor"],
+  halfSize: THREE.Vector3,
+  themeEntries: readonly ThemeEntry[] = [],
+): Obstacle[] {
+  const obstacles: Obstacle[] = [];
   const pineapple = findDecor(decor, "pineapple-house");
-  if (!pineapple) return [];
-  return [
-    {
+  if (pineapple) {
+    obstacles.push({
       position: new THREE.Vector3(
         pineapple.position.x,
         -halfSize.y + pineapple.height * 0.42,
@@ -41,11 +51,28 @@ function computeObstacles(decor: AquariumDescriptor["decor"], halfSize: THREE.Ve
       size: PINEAPPLE_OBSTACLE_SIZE.clone(),
       rotationY: pineapple.rotationY ?? 0,
       render: false,
-    },
-  ];
+    });
+  }
+
+  for (const entry of themeEntries) {
+    if (!entry.enabled) continue;
+    const footprint = getThemePropFootprint(entry.id, entry.scale);
+    const position = new THREE.Vector3(
+      entry.position.x,
+      -halfSize.y + footprint.height * 0.5,
+      entry.position.z,
+    );
+    const obstacle = getThemePropCollision(entry.id, position, entry.scale);
+    obstacle.rotationY = entry.rotationY;
+    obstacles.push(obstacle);
+  }
+  return obstacles;
 }
 
-function computeExclusionZones(decor: AquariumDescriptor["decor"]): ExclusionZone[] {
+export function computeExclusionZones(
+  decor: AquariumDescriptor["decor"],
+  themeEntries: readonly ThemeEntry[] = [],
+): ExclusionZone[] {
   const zones: ExclusionZone[] = [];
   const pineapple = findDecor(decor, "pineapple-house");
   if (pineapple) {
@@ -63,10 +90,21 @@ function computeExclusionZones(decor: AquariumDescriptor["decor"]): ExclusionZon
       size: FRONT_CORAL_MASK_SIZE.clone(),
     });
   }
+  for (const entry of themeEntries) {
+    if (!entry.enabled) continue;
+    zones.push(getThemeAvoidanceZone(
+      entry.id,
+      new THREE.Vector3(entry.position.x, 0, entry.position.z),
+      entry.scale,
+    ));
+  }
   return zones;
 }
 
-function computeClownfishAvoidanceZones(decor: AquariumDescriptor["decor"]): ExclusionZone[] {
+export function computeClownfishAvoidanceZones(
+  decor: AquariumDescriptor["decor"],
+  themeEntries: readonly ThemeEntry[] = [],
+): ExclusionZone[] {
   const zones: ExclusionZone[] = [];
   const pineapple = findDecor(decor, "pineapple-house");
   if (pineapple) {
@@ -95,6 +133,14 @@ function computeClownfishAvoidanceZones(decor: AquariumDescriptor["decor"]): Exc
       size: FRONT_CORAL_MASK_SIZE.clone().add(new THREE.Vector2(0.7, 0.65)),
       strength: 2.5,
     });
+  }
+  for (const entry of themeEntries) {
+    if (!entry.enabled) continue;
+    zones.push(getThemeAvoidanceZone(
+      entry.id,
+      new THREE.Vector3(entry.position.x, 0, entry.position.z),
+      entry.scale,
+    ));
   }
   return zones;
 }
@@ -140,11 +186,11 @@ export async function buildAquariumScene(
   scene.background = new THREE.Color(descriptor.theme.backgroundColor);
 
   const shell = createAquariumShell(root, renderer, halfSize);
-  const obstacles = computeObstacles(descriptor.decor, halfSize);
+  const obstacles = computeObstacles(descriptor.decor, halfSize, descriptor.themeEntries);
   addObstacles(root, obstacles);
 
-  const exclusionZones = computeExclusionZones(descriptor.decor);
-  const clownfishAvoidanceZones = computeClownfishAvoidanceZones(descriptor.decor);
+  const exclusionZones = computeExclusionZones(descriptor.decor, descriptor.themeEntries);
+  const clownfishAvoidanceZones = computeClownfishAvoidanceZones(descriptor.decor, descriptor.themeEntries);
   let habitatLayout = createHabitatLayout({ x: halfSize.x, y: halfSize.y, z: halfSize.z });
 
   const speciesDeps: SpeciesCreateDeps = {
