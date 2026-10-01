@@ -4,6 +4,7 @@ import type { FishGrowthRegistry } from "../growth/registry.js";
 import type { EcologyEntry, EcologyKind } from "../ecology/types.js";
 import type { HabitatLayer, HabitatRegion } from "./habitat.js";
 import type { WeatherEffects, WeatherKind, WeatherState } from "../weather/types.js";
+import type { ThemeEntry } from "../theme/types.js";
 
 /** Plain serializable 3D vector (no Three.js dependency for presets/tests). */
 export interface Vec3 {
@@ -25,7 +26,7 @@ export interface AquariumTheme {
 
 export interface DecorItem {
   id: string;
-  asset: "pineapple-house" | "spongebob-patrick";
+  asset: "pineapple-house" | "spongebob-patrick" | "squidward" | "mr-krabs" | "squidward-house" | "krusty-krab";
   position: Vec3;
   rotationY?: number;
   height: number;
@@ -51,6 +52,12 @@ export interface AquariumDescriptor {
   aquarium: { halfSize: Vec3 };
   theme: AquariumTheme;
   decor: DecorItem[];
+  /**
+   * Optional theme objects kept separate from the visual aquarium theme above.
+   * The field is optional so descriptors authored before theme content was
+   * introduced continue to load unchanged.
+   */
+  themeEntries?: ThemeEntry[];
   fish: FishEntry[];
   plants: PlantEntry[];
   /** Optional for backwards compatibility with older presets. */
@@ -180,6 +187,10 @@ export interface AquariumManager {
   getEcologyCount(speciesId: EcologyKind): number;
   getActiveEcology(): EcologyEntry[];
   getDescriptor(): AquariumDescriptor;
+  getThemeEntries(): ThemeEntry[];
+  setThemeEnabled(id: string, enabled: boolean): boolean;
+  setThemeAnimationEnabled(enabled: boolean): void;
+  setThemeScale(id: string, scale: number): boolean;
   getStyleIds(): string[];
   getHalfSize(): Vec3;
   getWaterLevelY(): number;

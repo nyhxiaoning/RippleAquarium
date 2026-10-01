@@ -66,6 +66,10 @@ function cloneDescriptor(descriptor: AquariumDescriptor): AquariumDescriptor {
       lighting: { ...descriptor.theme.lighting },
     },
     decor: descriptor.decor.map((item) => ({ ...item })),
+    themeEntries: (descriptor.themeEntries ?? []).map((entry) => ({
+      ...entry,
+      position: { ...entry.position },
+    })),
     fish: descriptor.fish.map((entry) => ({ ...entry })),
     plants: descriptor.plants.map((entry) => ({ ...entry })),
     ecology: descriptor.ecology?.map((entry) => ({ ...entry })),
@@ -87,6 +91,7 @@ export function createAquariumManager(
   for (const entry of descriptor.fish) growthRegistry.activate(entry.speciesId, entry.count);
   let growthSaveStatus = "empty";
   let growthSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  let themeAnimationEnabled = true;
   const listeners = new Set<(descriptor: AquariumDescriptor) => void>();
 
   function reconcileGrowth() {
@@ -179,6 +184,32 @@ export function createAquariumManager(
 
   return {
     getDescriptor: () => descriptor,
+    getThemeEntries: () => (descriptor.themeEntries ?? []).map((entry) => ({
+      ...entry,
+      position: { ...entry.position },
+    })),
+    setThemeEnabled(id: string, enabled: boolean) {
+      const entry = descriptor.themeEntries?.find((item) => item.id === id);
+      if (!entry) return false;
+      entry.enabled = Boolean(enabled);
+      notify();
+      return true;
+    },
+    setThemeAnimationEnabled(enabled: boolean) {
+      themeAnimationEnabled = Boolean(enabled);
+      // The live scene handle will consume this runtime setting when theme
+      // lifecycle integration lands. Keep the manager event contract in place
+      // so controls can rerender without touching growth/weather state.
+      void themeAnimationEnabled;
+      notify();
+    },
+    setThemeScale(id: string, scale: number) {
+      const entry = descriptor.themeEntries?.find((item) => item.id === id);
+      if (!entry || !Number.isFinite(scale)) return false;
+      entry.scale = Math.max(0, scale);
+      notify();
+      return true;
+    },
     getStyleIds: listStyleIds,
     getHalfSize: () => descriptor.aquarium.halfSize,
     getWaterLevelY: () => handle!.getWaterLevelY(),
