@@ -12,6 +12,7 @@ interface CoralModel {
 interface CoralState {
   modelIndex: number;
   instanceIndex: number;
+  variant: ReefVariant;
   visible: boolean;
   position: THREE.Vector3;
   scale: number;
@@ -28,13 +29,29 @@ interface CoralReefSettings {
   scale?: number;
   maxCount?: number;
   seed?: number;
+  variantSeed?: number;
   exclusionZones?: ExclusionZone[];
   halfSize?: THREE.Vector3;
 }
 
 type CoralRebuildSettings = Partial<Pick<CoralReef, "count" | "scale">> & {
   growth?: number[] | null;
+  variantSeed?: number;
 };
+
+export type ReefVariant = "branch" | "brain" | "plate";
+
+/**
+ * Select a visual reef family deterministically. Keeping the index in the
+ * hash makes adjacent instances cover all three families for any seed while
+ * still allowing a different seed to rotate the pattern.
+ */
+export function createReefVariant(index: number, seed = 73): ReefVariant {
+  const variants: ReefVariant[] = ["branch", "brain", "plate"];
+  const normalizedIndex = Number.isFinite(index) ? Math.floor(index) : 0;
+  const normalizedSeed = Number.isFinite(seed) ? Math.floor(seed) : 0;
+  return variants[Math.abs(normalizedIndex + normalizedSeed) % variants.length];
+}
 
 export interface CoralReef {
   group: THREE.Group;
@@ -43,6 +60,7 @@ export interface CoralReef {
   maxCount: number;
   animatedGrowth: number[] | null;
   seed: number;
+  variantSeed: number;
   exclusionZones: ExclusionZone[];
   halfSize: THREE.Vector3;
   corals: CoralState[];
@@ -82,6 +100,7 @@ export async function createCoralReef({
   scale = 2,
   maxCount = 200,
   seed = 73,
+  variantSeed,
   exclusionZones = [],
   halfSize = aquariumHalfSize,
 }: CoralReefSettings = {}): Promise<CoralReef> {
@@ -96,6 +115,7 @@ export async function createCoralReef({
     maxCount,
     animatedGrowth: null,
     seed,
+    variantSeed: variantSeed ?? seed,
     exclusionZones,
     halfSize,
     // Logical corals shared with consumers (e.g. clownfish avoidance). Each entry
@@ -110,6 +130,10 @@ export async function createCoralReef({
         : null;
       if (Number.isFinite(nextSettings.count)) reef.count = nextSettings.count;
       if (Number.isFinite(nextSettings.scale)) reef.scale = nextSettings.scale;
+      if (Number.isFinite(nextSettings.variantSeed)) {
+        reef.variantSeed = nextSettings.variantSeed as number;
+        applyCoralVariants(reef);
+      }
       if (Array.isArray(nextSettings.growth)) reef.animatedGrowth = nextSettings.growth;
       if (nextSettings.growth === null) reef.animatedGrowth = null;
       if (!Array.isArray(reef.animatedGrowth)) {
@@ -166,6 +190,7 @@ async function loadCoralModels() {
     const geometry = normalizeCoralGeometry(mesh.geometry);
     const material = new THREE.MeshStandardMaterial({
       color: coralColors[index % coralColors.length],
+      vertexColors: true,
       roughness: 0.82,
       metalness: 0,
     });
@@ -237,6 +262,7 @@ function buildCoralPool(reef: CoralReef, models: CoralModel[]): void {
     reef.corals.push({
       modelIndex,
       instanceIndex,
+      variant: createReefVariant(i, reef.variantSeed),
       visible: i < reef.count,
       position: new THREE.Vector3(position.x, aquariumFloorY + 0.015, position.z),
       scale: 0,
@@ -247,6 +273,18 @@ function buildCoralPool(reef: CoralReef, models: CoralModel[]): void {
       growthStartedAt: 0,
       growing: false,
     });
+  }
+}
+
+function applyCoralVariants(reef: CoralReef): void {
+  const random = mulberry32(reef.variantSeed + 101);
+  for (let index = 0; index < reef.corals.length; index += 1) {
+    const coral = reef.corals[index];
+    coral.variant = createReefVariant(index, reef.variantSeed);
+    // Keep the original placement stable when changing a variant seed, but
+    // give the new visual family a deterministic scale and orientation.
+    coral.baseScale = THREE.MathUtils.lerp(0.38, 0.95, random());
+    coral.baseRotationY = random() * Math.PI * 2;
   }
 }
 
@@ -384,6 +422,7 @@ function syncCorals(reef: CoralReef): void {
     coral.visible = visible;
 
     const mesh = reef.meshes[coral.modelIndex];
+    mesh.setColorAt(coral.instanceIndex, coralVariantColor(coral.variant));
     if (!visible) {
       coral.scale = 0;
       tmpMatrix.compose(coral.position, identityQuaternion(), hiddenScale);
@@ -405,13 +444,37 @@ function syncCorals(reef: CoralReef): void {
       Y_AXIS,
       coral.baseRotationY + (1 - growth) * 0.22,
     );
-    tmpScale.setScalar(renderScale);
+    const shape = coralVariantShape(coral.variant);
+    tmpScale.set(renderScale * shape.x, renderScale * shape.y, renderScale * shape.z);
     tmpMatrix.compose(tmpPosition, tmpQuaternion, tmpScale);
     mesh.setMatrixAt(coral.instanceIndex, tmpMatrix);
   }
 
   for (const mesh of reef.meshes) {
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }
+}
+
+function coralVariantShape(variant: ReefVariant): THREE.Vector3 {
+  switch (variant) {
+    case "branch":
+      return new THREE.Vector3(0.8, 1.24, 0.8);
+    case "brain":
+      return new THREE.Vector3(1.12, 0.94, 1.12);
+    case "plate":
+      return new THREE.Vector3(1.35, 0.56, 1.35);
+  }
+}
+
+function coralVariantColor(variant: ReefVariant): THREE.Color {
+  switch (variant) {
+    case "branch":
+      return new THREE.Color(0x55ad73);
+    case "brain":
+      return new THREE.Color(0xc76572);
+    case "plate":
+      return new THREE.Color(0xd89a58);
   }
 }
 

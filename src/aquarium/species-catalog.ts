@@ -62,6 +62,28 @@ export function getPlantMeta(speciesId: string) {
 
 interface CreateContext {
   coralReef?: SchoolHandle | null;
+  anemonePositions?: readonly THREE.Vector3[];
+}
+
+export interface SeaweedVariant {
+  height: number;
+  color: number;
+  phase: number;
+  sway: number;
+}
+
+/** Return stable per-blade variation so a rebuild does not reshuffle the reef. */
+export function createSeaweedVariant(index: number, seed = 73): SeaweedVariant {
+  const safeIndex = Number.isFinite(index) ? Math.floor(index) : 0;
+  const safeSeed = Number.isFinite(seed) ? Math.floor(seed) : 0;
+  const random = mulberry32(safeSeed + safeIndex * 7919 + 31337);
+  const palette = [0x2f8a4d, 0x3d9b52, 0x216f45, 0x55aa5b];
+  return {
+    height: THREE.MathUtils.lerp(0.7, 1.5, random()),
+    color: palette[Math.floor(random() * palette.length) % palette.length],
+    phase: random() * Math.PI * 2,
+    sway: THREE.MathUtils.lerp(0.04, 0.14, random()),
+  };
 }
 
 export function createFishSchool(
@@ -82,7 +104,12 @@ export function createFishSchool(
     case "clownfish": {
       const reef = ctx.coralReef?.reef;
       if (!reef) return null;
-      const school = createClownfishSchool(reef, { count, fishIds, avoidanceZones: deps.clownfishAvoidanceZones });
+      const school = createClownfishSchool(reef, {
+        count,
+        fishIds,
+        avoidanceZones: deps.clownfishAvoidanceZones,
+        anemonePositions: ctx.anemonePositions,
+      });
       return {
         group: school.mesh,
         update: (_time, dt) => school.update(_time, dt),
@@ -91,6 +118,7 @@ export function createFishSchool(
         getCount: () => school.mesh.count,
         getFishIds: () => school.getFishIds(),
         setGrowthSizes: (sizes) => school.setGrowthSizes(sizes),
+        setHabitatAnchors: (positions) => school.setHabitatAnchors(positions),
       };
     }
     case "starfish":
@@ -341,6 +369,7 @@ function createSeaweedSchool(count: number, deps: SpeciesCreateDeps): SchoolHand
     side: THREE.DoubleSide,
     transparent: true,
     opacity: 0.92,
+    vertexColors: true,
   });
   const mesh = new THREE.InstancedMesh(geometry, material, MAX);
   mesh.name = "Seaweed plants";
@@ -351,14 +380,18 @@ function createSeaweedSchool(count: number, deps: SpeciesCreateDeps): SchoolHand
 
   const items = Array.from({ length: MAX }, (_, index) => {
     const position = sampleBottomPosition(deps, index);
+    const variant = createSeaweedVariant(index, deps.seed + 173);
     return {
       index,
       position,
-      phase: Math.random() * Math.PI * 2,
-      height: THREE.MathUtils.lerp(0.7, 1.5, Math.random()),
-      sway: THREE.MathUtils.lerp(0.04, 0.14, Math.random()),
+      phase: variant.phase,
+      height: variant.height,
+      sway: variant.sway,
+      color: new THREE.Color(variant.color),
     };
   });
+
+  for (const item of items) mesh.setColorAt(item.index, item.color);
 
   const tmpMatrix = new THREE.Matrix4();
   const tmpQuaternion = new THREE.Quaternion();
@@ -380,6 +413,7 @@ function createSeaweedSchool(count: number, deps: SpeciesCreateDeps): SchoolHand
       mesh.setMatrixAt(item.index, tmpMatrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }
 
   update(0);

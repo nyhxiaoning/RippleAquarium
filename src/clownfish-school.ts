@@ -34,11 +34,12 @@ const tmpCorrection = new THREE.Vector3();
 
 export function createClownfishSchool(
   coralReef,
-  { count = 18, seed = 211, avoidanceZones = clownfishAvoidanceZones, fishIds }: {
+  { count = 18, seed = 211, avoidanceZones = clownfishAvoidanceZones, fishIds, anemonePositions = [] }: {
     count?: number;
     seed?: number;
     avoidanceZones?: ExclusionZone[];
     fishIds?: readonly string[];
+    anemonePositions?: readonly THREE.Vector3[];
   } = {},
 ) {
   const { geometry, material } = createFishModelInstanceByKey("clown");
@@ -58,8 +59,9 @@ export function createClownfishSchool(
   );
 
   const random = mulberry32(seed);
+  let reefAnchors = [...anemonePositions];
   let fish = Array.from({ length: maxCount }, (_, index) =>
-    createClownfish(index, random, avoidanceZones, fishIds?.[index]),
+    createClownfish(index, random, avoidanceZones, fishIds?.[index], coralReef, reefAnchors),
   );
   const growthSizes = new Array<number>(maxCount).fill(1);
   function update(time, dt) {
@@ -67,7 +69,7 @@ export function createClownfishSchool(
     for (const item of fish) {
       if (item.index >= mesh.count) continue;
 
-      updateClownfish(item, coralReef, step, time, avoidanceZones);
+      updateClownfish(item, coralReef, step, time, avoidanceZones, reefAnchors);
       writeFishOrientationQuaternion(item, item.velocity, tmpQuaternion);
       updateFishCurveAttributes(curveAttributes, item.index, item, tmpQuaternion);
       tmpScale.setScalar(swimScale * (Number.isFinite(growthSizes[item.index]) ? growthSizes[item.index] : 1));
@@ -106,6 +108,10 @@ export function createClownfishSchool(
       for (let i = 0; i < mesh.count; i += 1) growthSizes[i] = sizes[i] ?? 1;
       update(0, 0);
     },
+    setHabitatAnchors(positions: readonly THREE.Vector3[] = []) {
+      reefAnchors = [...positions];
+      update(0, 0);
+    },
   };
 }
 
@@ -113,8 +119,15 @@ function normalizeCount(count) {
   return THREE.MathUtils.clamp(Math.floor(count), 0, maxCount);
 }
 
-function createClownfish(index, random, zones: ExclusionZone[] = clownfishAvoidanceZones, fishId?: string) {
-  const position = createClownfishPosition(random, zones);
+function createClownfish(
+  index,
+  random,
+  zones: ExclusionZone[] = clownfishAvoidanceZones,
+  fishId?: string,
+  coralReef?,
+  anemonePositions: readonly THREE.Vector3[] = [],
+) {
+  const position = createClownfishPosition(random, zones, coralReef, anemonePositions, index);
   const angle = random() * Math.PI * 2;
   const speed = THREE.MathUtils.lerp(0.42, 0.78, random());
 
@@ -131,8 +144,25 @@ function createClownfish(index, random, zones: ExclusionZone[] = clownfishAvoida
   };
 }
 
-function createClownfishPosition(random, zones: ExclusionZone[] = clownfishAvoidanceZones) {
+function createClownfishPosition(
+  random,
+  zones: ExclusionZone[] = clownfishAvoidanceZones,
+  coralReef?,
+  anemonePositions: readonly THREE.Vector3[] = [],
+  index = 0,
+) {
   const fallback = new THREE.Vector3();
+
+  const anchors = collectReefAnchors(coralReef, anemonePositions);
+  if (anchors.length > 0) {
+    const anchor = anchors[index % anchors.length];
+    const anchored = new THREE.Vector3(
+      anchor.x + (random() - 0.5) * 1.8,
+      anchor.y + (random() - 0.5) * 0.8,
+      anchor.z + (random() - 0.5) * 1.8,
+    );
+    if (!isInsideDecorZones(anchored, zones)) return anchored;
+  }
 
   for (let attempt = 0; attempt < spawnRetryCount; attempt += 1) {
     const position = randomClownfishPosition(random);
@@ -156,7 +186,14 @@ function randomClownfishPosition(random) {
   );
 }
 
-function updateClownfish(item, coralReef, dt, time, zones: ExclusionZone[] = clownfishAvoidanceZones) {
+function updateClownfish(
+  item,
+  coralReef,
+  dt,
+  time,
+  zones: ExclusionZone[] = clownfishAvoidanceZones,
+  anemonePositions: readonly THREE.Vector3[] = [],
+) {
   const homeY = aquariumFloorY + floorOffset + verticalRange * 0.42;
   tmpRepel.set(0, 0, 0);
 
@@ -170,6 +207,7 @@ function updateClownfish(item, coralReef, dt, time, zones: ExclusionZone[] = clo
       tmpRepel.addScaledVector(offset.normalize(), (avoidRadius * avoidRadius - distanceSq) / avoidRadius);
     }
   }
+  applyReefAnchorAttraction(item, coralReef, anemonePositions, tmpRepel);
   repelFromDecorZones(item, tmpRepel, zones);
 
   const topY = aquariumFloorY + floorOffset + verticalRange;
@@ -197,6 +235,36 @@ function updateClownfish(item, coralReef, dt, time, zones: ExclusionZone[] = clo
   item.swimPhase += dt * 8.5;
   item.swimDrive = 0.7;
   item.curveBendWorld.copy(item.velocity).normalize().multiplyScalar(0.2 * item.turnBias);
+}
+
+function collectReefAnchors(coralReef, anemonePositions: readonly THREE.Vector3[]): THREE.Vector3[] {
+  const anchors = coralReef?.corals
+    ?.filter((coral) => coral.visible && coral.scale > 0)
+    .map((coral) => coral.position)
+    ?? [];
+  return [...anchors, ...anemonePositions];
+}
+
+function applyReefAnchorAttraction(item, coralReef, anemonePositions: readonly THREE.Vector3[], repel: THREE.Vector3) {
+  const anchors = collectReefAnchors(coralReef, anemonePositions);
+  if (anchors.length === 0) return;
+
+  let nearest = anchors[0];
+  let nearestDistanceSq = item.position.distanceToSquared(nearest);
+  for (let index = 1; index < anchors.length; index += 1) {
+    const candidate = anchors[index];
+    const distanceSq = item.position.distanceToSquared(candidate);
+    if (distanceSq < nearestDistanceSq) {
+      nearest = candidate;
+      nearestDistanceSq = distanceSq;
+    }
+  }
+
+  // Keep the reef as a home region without pinning fish to a single coral.
+  const distance = Math.sqrt(nearestDistanceSq);
+  if (distance > 1.1) {
+    repel.addScaledVector(tmpDirection.copy(nearest).sub(item.position).normalize(), Math.min(0.42, (distance - 1.1) * 0.12));
+  }
 }
 
 function repelFromDecorZones(item, repel, zones: ExclusionZone[] = clownfishAvoidanceZones) {

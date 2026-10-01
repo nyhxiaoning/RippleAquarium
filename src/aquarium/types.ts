@@ -97,6 +97,8 @@ export interface SchoolHandle {
   rescalePositions?(halfSize: THREE.Vector3): void;
   /** Update the spatial region used by a schooling fish simulation. */
   setAllowedRegion?(region?: HabitatRegion): void;
+  /** Update friendly reef anchors used by the clownfish school. */
+  setHabitatAnchors?(positions: readonly THREE.Vector3[]): void;
   /** Expose a member's state for the fish-view camera (schooling fish). */
   getFish?(index: number): FishState | undefined;
   /** Update this school's tunable settings in place (boids behavior / coral). */

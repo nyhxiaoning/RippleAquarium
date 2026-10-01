@@ -97,6 +97,26 @@ function computeClownfishAvoidanceZones(decor: AquariumDescriptor["decor"]): Exc
   return zones;
 }
 
+function collectAnemoneAnchors(school: SchoolHandle | undefined): THREE.Vector3[] {
+  if (!school) return [];
+  const mesh = school.group.children.find(
+    (child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh,
+  );
+  if (!mesh) return [];
+
+  const anchors: THREE.Vector3[] = [];
+  const matrix = new THREE.Matrix4();
+  const position = new THREE.Vector3();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  for (let index = 0; index < mesh.count; index += 1) {
+    mesh.getMatrixAt(index, matrix);
+    matrix.decompose(position, quaternion, scale);
+    anchors.push(position.clone());
+  }
+  return anchors;
+}
+
 export async function buildAquariumScene(
   descriptor: AquariumDescriptor,
   deps: { renderer: THREE.WebGLRenderer; scene: THREE.Scene; growthRegistry: import("../growth/registry.js").FishGrowthRegistry },
@@ -161,8 +181,6 @@ export async function buildAquariumScene(
     }
   }
 
-  const ctx = { coralReef: plantSchools.get("coral") ?? null };
-
   for (const entry of ecologyEntries) {
     const school = createEcologySchool(entry.speciesId, entry.count, ecologyDeps);
     if (school) {
@@ -173,7 +191,12 @@ export async function buildAquariumScene(
     }
   }
 
-  function buildFishSchools(entries: AquariumDescriptor["fish"], context: typeof ctx) {
+  const createFishContext = () => ({
+    coralReef: plantSchools.get("coral") ?? null,
+    anemonePositions: collectAnemoneAnchors(ecologySchools.get("anemone")),
+  });
+
+  function buildFishSchools(entries: AquariumDescriptor["fish"], context = createFishContext()) {
     for (const entry of entries) {
       const school = createFishSchool(entry.speciesId, entry.count, speciesDeps, context);
       if (school) {
@@ -187,7 +210,7 @@ export async function buildAquariumScene(
   /** Rebuild only the fish schools after their GLBs finish loading, preserving
    *  the coral intro growth state and everything else. */
   function refreshFishMeshes() {
-    const context = { coralReef: plantSchools.get("coral") ?? null };
+    const context = createFishContext();
     for (const entry of descriptor.fish) {
       const old = fishSchools.get(entry.speciesId);
       if (old) {
@@ -199,7 +222,7 @@ export async function buildAquariumScene(
     buildFishSchools(descriptor.fish, context);
   }
 
-  buildFishSchools(descriptor.fish, ctx);
+  buildFishSchools(descriptor.fish);
 
   // Decor models (pineapple house, spongebob & patrick) stream in async.
   for (const item of descriptor.decor) {
@@ -267,6 +290,7 @@ export async function buildAquariumScene(
     for (const school of ecologySchools.values()) {
       school.resize?.(halfSize);
     }
+    refreshClownfishHabitatAnchors();
   }
 
   function setFishCount(speciesId: string, count: number) {
@@ -284,7 +308,7 @@ export async function buildAquariumScene(
 
   function addFish(speciesId: string, count: number): SchoolHandle | null {
     if (fishSchools.has(speciesId)) return null;
-    const school = createFishSchool(speciesId, count, speciesDeps, ctx);
+    const school = createFishSchool(speciesId, count, speciesDeps, createFishContext());
     if (!school) return null;
     school.group.name = `Fish-${speciesId}`;
     root.add(school.group);
@@ -324,6 +348,7 @@ export async function buildAquariumScene(
     school.setCount(count);
     const entry = ecologyEntries.find((item) => item.speciesId === speciesId);
     if (entry) entry.count = school.getCount();
+    refreshClownfishHabitatAnchors();
   }
 
   function addEcology(speciesId: EcologyKind, count: number): SchoolHandle | null {
@@ -334,6 +359,7 @@ export async function buildAquariumScene(
     root.add(school.group);
     ecologySchools.set(speciesId, school);
     ecologyEntries.push({ speciesId, count: school.getCount() });
+    refreshClownfishHabitatAnchors();
     return school;
   }
 
@@ -345,6 +371,14 @@ export async function buildAquariumScene(
     ecologySchools.delete(speciesId);
     const index = ecologyEntries.findIndex((entry) => entry.speciesId === speciesId);
     if (index >= 0) ecologyEntries.splice(index, 1);
+    refreshClownfishHabitatAnchors();
+  }
+
+  function refreshClownfishHabitatAnchors() {
+    const school = fishSchools.get("clownfish") as (SchoolHandle & {
+      setHabitatAnchors?: (positions: readonly THREE.Vector3[]) => void;
+    }) | undefined;
+    school?.setHabitatAnchors?.(collectAnemoneAnchors(ecologySchools.get("anemone")));
   }
 
   function dispose() {
