@@ -20,6 +20,8 @@ import type {
   AquariumManager,
   AquariumSceneHandle,
 } from "./types.js";
+import { createWeatherController } from "../weather/controller.js";
+import type { WeatherKind } from "../weather/types.js";
 
 function volume(halfSize: { x: number; y: number; z: number }) {
   return halfSize.x * 2 * halfSize.y * 2 * halfSize.z * 2;
@@ -73,6 +75,7 @@ export function createAquariumManager(
   let descriptor = cloneDescriptor(initialDescriptor);
   let handle: AquariumSceneHandle | null = null;
   const growthRegistry = createFishGrowthRegistry();
+  const weather = createWeatherController();
   // Keep the manager immediately usable for callers that inspect it before
   // init(); init() may replace these records with a persisted snapshot.
   for (const entry of descriptor.fish) growthRegistry.activate(entry.speciesId, entry.count);
@@ -157,6 +160,7 @@ export function createAquariumManager(
       handle.dispose();
     }
     handle = await buildAquariumScene(descriptor, { renderer, scene, growthRegistry });
+    handle.setWeatherEffects(weather.getEffects(), weather.getState());
     cameraRig.configure(
       new THREE.Vector3(
         descriptor.aquarium.halfSize.x,
@@ -193,9 +197,28 @@ export function createAquariumManager(
       handle?.setCoralGrowth(count, scale, growth);
     },
     getCoralMaxCount: () => handle!.getCoralMaxCount(),
+    getWeatherState: () => weather.getState(),
+    getWeatherEffects: () => weather.getEffects(),
+    setWeather(kind: WeatherKind) {
+      weather.setWeather(kind);
+      handle?.setWeatherEffects(weather.getEffects(), weather.getState());
+      notify();
+    },
+    setWeatherAutoCycle(enabled: boolean) {
+      weather.setAutoCycle(enabled);
+      handle?.setWeatherEffects(weather.getEffects(), weather.getState());
+      notify();
+    },
     update(time, dt) {
-      if (handle) handle.update(time, dt);
-      else if (dt > 0) growthRegistry.advanceOnline(dt);
+      const previous = weather.getState();
+      const state = weather.update(dt);
+      if (handle) {
+        handle.setWeatherEffects(weather.getEffects(), state);
+        handle.update(time, dt);
+      } else if (dt > 0) {
+        growthRegistry.advanceOnline(dt * weather.getEffects().growthRateMultiplier);
+      }
+      if (state.kind !== previous.kind || state.autoCycle !== previous.autoCycle) notify();
       if (dt > 0) markGrowthDirty();
     },
     on(event, cb) {

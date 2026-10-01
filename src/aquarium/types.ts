@@ -3,6 +3,7 @@ import type { ExclusionZone, FishState, Obstacle, SimulationSettings } from "../
 import type { FishGrowthRegistry } from "../growth/registry.js";
 import type { EcologyEntry, EcologyKind } from "../ecology/types.js";
 import type { HabitatLayer, HabitatRegion } from "./habitat.js";
+import type { WeatherEffects, WeatherKind, WeatherState } from "../weather/types.js";
 
 /** Plain serializable 3D vector (no Three.js dependency for presets/tests). */
 export interface Vec3 {
@@ -157,6 +158,8 @@ export interface AquariumSceneHandle {
   setCoralGrowth(count: number, scale: number, growth: number[] | null): void;
   getCoralMaxCount(): number;
   refreshFishMeshes(): void;
+  setWeatherEffects(effects: WeatherEffects, state?: WeatherState): void;
+  getWeatherState(): WeatherState;
 }
 
 export type ManagerEvent = "change";
@@ -201,4 +204,8 @@ export interface AquariumManager {
   exportGrowth(): string;
   getGrowthSaveStatus(): string;
   getGrowthRecords(speciesId?: string, includeInactive?: boolean): import("../growth/types.js").FishGrowthRecord[];
+  getWeatherState(): WeatherState;
+  setWeather(kind: WeatherKind): void;
+  setWeatherAutoCycle(enabled: boolean): void;
+  getWeatherEffects(): WeatherEffects;
 }

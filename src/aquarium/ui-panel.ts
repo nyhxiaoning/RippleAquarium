@@ -2,6 +2,7 @@ import { FISH_CATALOG, PLANT_CATALOG, getFishMeta, getPlantMeta } from "./specie
 import { getStyleById, listStyleIds } from "./presets.js";
 import { getLanguage, t } from "../i18n.js";
 import type { AquariumManager } from "./types.js";
+import { WEATHER_KINDS, type WeatherKind } from "../weather/types.js";
 
 export function createProjectPanel(manager: AquariumManager, container: HTMLElement) {
   const root = document.createElement("section");
@@ -10,11 +11,14 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
   container.insertBefore(root, container.firstChild);
 
   let suppressRender = false;
+  let weatherTimer: ReturnType<typeof setInterval> | null = null;
 
   manager.on("change", () => {
     if (suppressRender) return;
     render();
   });
+  const handleLanguageChange = () => render();
+  document.addEventListener("languagechange", handleLanguageChange);
 
   function render() {
     root.innerHTML = "";
@@ -105,6 +109,8 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
     root.appendChild(fishList);
     root.appendChild(buildAddSelect("fish", descriptor, manager));
 
+    root.appendChild(buildWeatherSection(manager));
+
     // Plant species
     const plantTitle = document.createElement("h3");
     plantTitle.textContent = t("plantSpecies");
@@ -118,6 +124,68 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
     root.appendChild(buildAddSelect("plant", descriptor, manager));
 
     root.appendChild(buildGrowthSection(manager, descriptor));
+  }
+
+  function buildWeatherSection(manager: AquariumManager) {
+    const section = document.createElement("section");
+    section.className = "weather-section";
+    const title = document.createElement("h3");
+    title.textContent = t("weatherTitle");
+    section.appendChild(title);
+
+    const status = document.createElement("p");
+    status.className = "weather-status";
+    const updateStatus = () => {
+      const state = manager.getWeatherState();
+      status.textContent = `${t(`weather_${state.kind}`)} · ${Math.ceil(state.remainingSeconds)}s`;
+    };
+    updateStatus();
+    section.appendChild(status);
+
+    const controls = document.createElement("div");
+    controls.className = "weather-controls";
+    const select = document.createElement("select");
+    select.className = "add-select";
+    select.setAttribute("aria-label", t("weatherSelect"));
+    const current = manager.getWeatherState().kind;
+    for (const kind of WEATHER_KINDS) {
+      const option = document.createElement("option");
+      option.value = kind;
+      option.textContent = t(`weather_${kind}`);
+      option.selected = kind === current;
+      select.appendChild(option);
+    }
+    controls.appendChild(select);
+
+    const switchButton = document.createElement("button");
+    switchButton.type = "button";
+    switchButton.textContent = t("weatherSwitch");
+    switchButton.addEventListener("click", () => {
+      manager.setWeather(select.value as WeatherKind);
+      render();
+    });
+    controls.appendChild(switchButton);
+    section.appendChild(controls);
+
+    const autoLabel = document.createElement("label");
+    autoLabel.className = "weather-auto-label";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = manager.getWeatherState().autoCycle;
+    checkbox.addEventListener("change", () => {
+      manager.setWeatherAutoCycle(checkbox.checked);
+      updateStatus();
+    });
+    autoLabel.appendChild(checkbox);
+    autoLabel.appendChild(document.createTextNode(t("weatherAutoCycle")));
+    section.appendChild(autoLabel);
+
+    if (weatherTimer === null) {
+      weatherTimer = setInterval(() => {
+        if (root.isConnected) updateStatus();
+      }, 1000);
+    }
+    return section;
   }
 
   function buildGrowthSection(manager: AquariumManager, descriptor: ReturnType<AquariumManager["getDescriptor"]>) {
@@ -292,6 +360,9 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
 
   return {
     dispose() {
+      if (weatherTimer !== null) clearInterval(weatherTimer);
+      weatherTimer = null;
+      document.removeEventListener("languagechange", handleLanguageChange);
       root.remove();
     },
   };

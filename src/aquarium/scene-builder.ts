@@ -14,6 +14,8 @@ import type {
   SpeciesCreateDeps,
 } from "./types.js";
 import type { ExclusionZone, Obstacle } from "../types.js";
+import { getWeatherEffects } from "../weather/effects.js";
+import type { WeatherEffects, WeatherState } from "../weather/types.js";
 
 const PINEAPPLE_OBSTACLE_SIZE = new THREE.Vector3(4.35, 5.1, 4.05);
 const PINEAPPLE_FOOTPRINT_RADIUS = 3.53;
@@ -135,6 +137,7 @@ export async function buildAquariumScene(
 
   const lighting = addLighting(root, halfSize);
   lighting.setIntensity(descriptor.theme.lighting.hemiIntensity);
+  scene.background = new THREE.Color(descriptor.theme.backgroundColor);
 
   const shell = createAquariumShell(root, renderer, halfSize);
   const obstacles = computeObstacles(descriptor.decor, halfSize);
@@ -170,6 +173,28 @@ export async function buildAquariumScene(
   const plantSchools = new Map<string, SchoolHandle>();
   const ecologySchools = new Map<EcologyKind, SchoolHandle>();
   const ecologyEntries: EcologyEntry[] = (descriptor.ecology ?? []).map((entry) => ({ ...entry }));
+  let weatherEffects: WeatherEffects = getWeatherEffects("clear");
+  let weatherState: WeatherState = Object.freeze({
+    kind: "clear",
+    progress: 1,
+    remainingSeconds: 90,
+    autoCycle: true,
+  });
+  let lastLightningCheck = -Infinity;
+  let lightningFlashUntil = -Infinity;
+  const baseBoidsSettings = new Map<string, Record<string, number>>();
+
+  function applyWeatherBoidsSettings() {
+    for (const [speciesId, base] of baseBoidsSettings) {
+      const school = fishSchools.get(speciesId);
+      if (!school) continue;
+      school.setSettings?.({
+        ...base,
+        minSpeed: (base.minSpeed ?? simulationSettings.minSpeed) * weatherEffects.fishSpeedMultiplier,
+        maxSpeed: (base.maxSpeed ?? simulationSettings.maxSpeed) * weatherEffects.fishSpeedMultiplier,
+      });
+    }
+  }
 
   // Plants first: the clownfish school needs the coral reef to avoid.
   for (const entry of descriptor.plants) {
@@ -203,8 +228,15 @@ export async function buildAquariumScene(
         school.group.name = `Fish-${entry.speciesId}`;
         root.add(school.group);
         fishSchools.set(entry.speciesId, school);
+        if (!baseBoidsSettings.has(entry.speciesId)) {
+          baseBoidsSettings.set(entry.speciesId, {
+            minSpeed: speciesDeps.settings.minSpeed,
+            maxSpeed: speciesDeps.settings.maxSpeed,
+          });
+        }
       }
     }
+    applyWeatherBoidsSettings();
   }
 
   /** Rebuild only the fish schools after their GLBs finish loading, preserving
@@ -248,7 +280,17 @@ export async function buildAquariumScene(
   scene.add(root);
 
   function update(time: number, dt: number) {
-    if (dt > 0) growthRegistry.advanceOnline(dt);
+    if (dt > 0) growthRegistry.advanceOnline(dt * weatherEffects.growthRateMultiplier);
+    if (weatherEffects.lightningChance > 0 && time >= lastLightningCheck + 1.5) {
+      lastLightningCheck = time;
+      // A deterministic, throttled check keeps storm flashes rare without
+      // allocating random state or making a frame-dependent visual effect.
+      const roll = (Math.sin(time * 12.9898 + 78.233) * 43758.5453) % 1;
+      if (Math.abs(roll) < weatherEffects.lightningChance) {
+        lightningFlashUntil = time + 0.16;
+      }
+    }
+    lighting.setLightningFlash?.(time < lightningFlashUntil ? 2.4 : 1);
     for (const school of fishSchools.values()) {
       school.update(time, dt);
       const ids = school.getFishIds();
@@ -322,6 +364,7 @@ export async function buildAquariumScene(
     school.dispose();
     root.remove(school.group);
     fishSchools.delete(speciesId);
+    baseBoidsSettings.delete(speciesId);
   }
 
   async function addPlant(speciesId: string, count: number): Promise<SchoolHandle | null> {
@@ -388,6 +431,7 @@ export async function buildAquariumScene(
     fishSchools.clear();
     plantSchools.clear();
     ecologySchools.clear();
+    baseBoidsSettings.clear();
     shell.dispose();
     lighting; // lights are part of the root group, cleared with it
     root.clear();
@@ -428,7 +472,17 @@ export async function buildAquariumScene(
     getFish: (speciesId, index) => fishSchools.get(speciesId)?.getFish?.(index) ?? undefined,
     getLighting: () => lighting,
     setBoidsSettings(speciesId, settings) {
-      fishSchools.get(speciesId)?.setSettings?.(settings);
+      const base = {
+        ...(baseBoidsSettings.get(speciesId) ?? {}),
+        ...settings,
+      };
+      baseBoidsSettings.set(speciesId, base);
+      const weathered = {
+        ...base,
+        minSpeed: (base.minSpeed ?? simulationSettings.minSpeed) * weatherEffects.fishSpeedMultiplier,
+        maxSpeed: (base.maxSpeed ?? simulationSettings.maxSpeed) * weatherEffects.fishSpeedMultiplier,
+      };
+      fishSchools.get(speciesId)?.setSettings?.(weathered);
     },
     setPlantSettings(speciesId, settings) {
       plantSchools.get(speciesId)?.setSettings?.(settings);
@@ -441,5 +495,16 @@ export async function buildAquariumScene(
       return plantSchools.get("coral")?.getMaxCount?.() ?? 0;
     },
     refreshFishMeshes,
+    setWeatherEffects(effects, state) {
+      weatherEffects = effects;
+      if (state) weatherState = Object.freeze({ ...state });
+      lighting.setWeatherMultiplier?.(effects.lightingMultiplier);
+      shell.waterSurface.setWeatherEffects?.(effects);
+      applyWeatherBoidsSettings();
+      if (scene.background instanceof THREE.Color) {
+        scene.background.set(effects.backgroundColor);
+      }
+    },
+    getWeatherState: () => weatherState,
   };
 }

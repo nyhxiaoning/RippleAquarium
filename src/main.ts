@@ -167,6 +167,9 @@ function bindLanguageSwitcher() {
     button.addEventListener("click", () => {
       if (!setLanguage(button.dataset.lang)) return;
       applyCurrentLanguage();
+      // Dynamic project controls (including weather) listen for this event so
+      // their labels are rebuilt in the newly selected language.
+      document.dispatchEvent(new Event("languagechange"));
     });
   });
 }

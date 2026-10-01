@@ -48,10 +48,28 @@ export function addLighting(scene, halfSize = aquariumHalfSize) {
   sun.shadow.camera.updateProjectionMatrix();
   scene.add(sun);
 
+  let userMultiplier = 1;
+  let weatherMultiplier = 1;
+  let lightningMultiplier = 1;
+
+  function applyIntensity() {
+    const multiplier = userMultiplier * weatherMultiplier * lightningMultiplier;
+    hemiLight.intensity = hemiBaseIntensity * multiplier;
+    sun.intensity = sunBaseIntensity * multiplier;
+  }
+
   return {
     setIntensity(multiplier) {
-      hemiLight.intensity = hemiBaseIntensity * multiplier;
-      sun.intensity = sunBaseIntensity * multiplier;
+      userMultiplier = Number.isFinite(multiplier) ? multiplier : 1;
+      applyIntensity();
+    },
+    setWeatherMultiplier(multiplier) {
+      weatherMultiplier = Number.isFinite(multiplier) ? Math.max(0, multiplier) : 1;
+      applyIntensity();
+    },
+    setLightningFlash(multiplier) {
+      lightningMultiplier = Number.isFinite(multiplier) ? Math.max(1, multiplier) : 1;
+      applyIntensity();
     },
     resize(nextHalfSize) {
       sun.position.y = nextHalfSize.y + 7;

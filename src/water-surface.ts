@@ -28,6 +28,7 @@ uniform float uDampLarge;
 uniform float uAmpThresh;
 uniform float uRadius;
 uniform float uForce;
+uniform float uRippleMultiplier;
 
 float sdSegment(vec2 p, vec2 a, vec2 b) {
   vec2 pa = p - a;
@@ -65,7 +66,7 @@ void main() {
     float source = smoothstep(uRadius, 0.0, distanceToPath);
     float falloff = exp(-(distanceToPath * distanceToPath) / max(uRadius * uRadius, 0.0001));
     float strength = uForce * mix(0.42, 1.0, smoothstep(0.0, 0.16, travel));
-    next += strength * mix(source, falloff, 0.28);
+    next += strength * mix(source, falloff, 0.28) * uRippleMultiplier;
   }
 
   float deadzone = 0.0032;
@@ -207,6 +208,9 @@ export function createWaterSurface(renderer) {
       uAmpThresh: { value: 0.12 },
       uRadius: { value: 0.42 },
       uForce: { value: 0.085 },
+      // Weather scales the source strength at runtime. Keep the default at
+      // one so existing water settings and shader output remain unchanged.
+      uRippleMultiplier: { value: 1 },
     },
   });
   simulationScene.add(new THREE.Mesh(simulationGeometry, simulationMaterial));
@@ -269,6 +273,28 @@ export function createWaterSurface(renderer) {
     }
   }
 
+  let rainIntensity = 0;
+  let nextRainTime = 0;
+  let rainSequence = 0;
+  let rainNeedsSchedule = false;
+  const rainFrom = new THREE.Vector3();
+  const rainTo = new THREE.Vector3();
+
+  /** Apply weather without replacing the user's normal water controls. */
+  function setWeatherEffects(settings) {
+    if (Number.isFinite(settings.rippleMultiplier)) {
+      simulationMaterial.uniforms.uRippleMultiplier.value = Math.max(0, settings.rippleMultiplier);
+    }
+    if (Number.isFinite(settings.rainIntensity)) {
+      const nextIntensity = THREE.MathUtils.clamp(settings.rainIntensity, 0, 1);
+      // Switching into rain should produce an impact promptly, while leaving
+      // the cadence throttled for the rest of the mode. Do not reset the
+      // schedule on every frame while a transition is changing intensity.
+      if (rainIntensity <= 0 && nextIntensity > 0) rainNeedsSchedule = true;
+      rainIntensity = nextIntensity;
+    }
+  }
+
   function isInsideWater(point) {
     return (
       Math.abs(point.x) <= waterBounds.x * 0.5 &&
@@ -277,6 +303,28 @@ export function createWaterSurface(renderer) {
   }
 
   function update(time) {
+    if (rainIntensity > 0) {
+      if (rainNeedsSchedule) {
+        nextRainTime = time;
+        rainNeedsSchedule = false;
+      }
+      const interval = THREE.MathUtils.lerp(0.28, 0.075, rainIntensity);
+      let emitted = 0;
+      while (time >= nextRainTime && emitted < 6) {
+        const sequence = rainSequence;
+        const x = Math.sin(sequence * 12.9898 + 1.7) * waterBounds.x * 0.47;
+        const z = Math.sin(sequence * 78.233 + 4.1) * waterBounds.y * 0.47;
+        rainFrom.set(x, 0, z);
+        rainTo.set(x + Math.cos(sequence * 4.37) * 0.14, 0, z + Math.sin(sequence * 5.91) * 0.14);
+        queueImpact(rainFrom, rainTo);
+        rainSequence += 1;
+        nextRainTime += interval;
+        emitted += 1;
+      }
+    } else {
+      nextRainTime = time;
+    }
+
     const count = Math.min(queuedImpacts.length, MAX_IMPACTS);
     for (let i = 0; i < count; i += 1) {
       const impact = queuedImpacts.shift();
@@ -318,6 +366,9 @@ export function createWaterSurface(renderer) {
     if (Number.isFinite(settings.persistence)) {
       simulationMaterial.uniforms.uDampLarge.value = settings.persistence;
     }
+    if (Number.isFinite(settings.rippleMultiplier)) {
+      simulationMaterial.uniforms.uRippleMultiplier.value = Math.max(0, settings.rippleMultiplier);
+    }
   }
 
   function dispose() {
@@ -344,6 +395,7 @@ export function createWaterSurface(renderer) {
     update,
     queueImpact,
     setSettings,
+    setWeatherEffects,
     resize,
     dispose,
   };
