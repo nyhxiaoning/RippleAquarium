@@ -51,11 +51,23 @@ A whole tank of fish swims on its own using boids flocking: they gather, turn, a
 |--------|-------------|
 | **Fish schools** | Sardines and koi move as independent schools using the same boids behavior, with separate count, speed, and behavior controls |
 | **Clownfish** | Bottom-dwelling movement around the reef and the small water region above it, with coral avoidance |
+| **Fish growth records** | Per-fish IDs, age, growth stage, and body scale with online growth, offline catch-up, and export controls |
 | **Water surface** | Height-field water simulation triggered by mouse clicks, mouse drags, and fish near the waterline |
 | **Coral reef** | On page load or refresh, corals grow from zero count and zero scale into the default reef |
 | **Control drawer** | Collapsible right-side panel for fish, water, coral, lighting, and visual parameters |
 | **Internationalization** | The UI and README support Chinese and English |
 | **Deployment** | TypeScript-built static frontend deployable on GitHub Pages |
+
+### Fish growth and persistence
+
+Every fish has its own stable ID. Fish start as juveniles and grow on accumulated simulation time by default: 0–20 minutes is the juvenile phase, 20–80 minutes is the growing phase, fish enter the adult phase at 80 minutes, and reach full size at 120 minutes. Scale changes smoothly instead of jumping at phase boundaries.
+
+- Online growth advances only while the simulation is playing. Pausing the simulation, including single-step mode while paused, does not add background growth.
+- When the page is reopened, offline growth is caught up from the last save, capped at 24 hours.
+- Growth records are stored in browser `localStorage` and require no backend service. They normally autosave every 10 seconds and are also saved when the page is hidden or unloaded when possible.
+- The **Fish Growth** section in the control panel shows total fish, average progress, per-species statistics, and individual records. It provides **Export growth** and a confirmation-protected **Reset growth** action. The export is JSON for backup or inspection.
+
+The current scope is individual fish growth and persistence. Weather changes and a broader marine-biodiversity simulation are not implemented yet and can be added in a later phase.
 
 ---
 
