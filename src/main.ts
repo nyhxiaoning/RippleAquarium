@@ -105,6 +105,14 @@ const cameraPanel = bindCameraPanel(cameraRig);
 const modelLoading = bindModelLoading();
 createProjectPanel(manager, getRequiredElement("#control-panel"));
 
+// Growth snapshots are browser-local and should be flushed whenever the page
+// is backgrounded or discarded. These events are synchronous by design.
+const saveGrowthOnPageLifecycle = () => {
+  if (document.visibilityState === "hidden") manager.saveGrowth();
+};
+document.addEventListener("visibilitychange", saveGrowthOnPageLifecycle);
+window.addEventListener("pagehide", () => manager.saveGrowth());
+
 // Build the default scene immediately (fallback fish models), then hot-swap to
 // the high-detail GLBs once they stream in.
 void manager.init().then(() => {

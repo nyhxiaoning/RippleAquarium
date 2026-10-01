@@ -168,4 +168,10 @@ export interface AquariumManager {
   dispose(): void;
   getGrowthRegistry(): FishGrowthRegistry;
   getGrowthStats(speciesId?: string): import("../growth/types.js").GrowthStats;
+  loadGrowth(): import("../growth/storage.js").GrowthLoadResult;
+  saveGrowth(): "saved" | "unavailable";
+  resetGrowth(): "cleared" | "unavailable";
+  exportGrowth(): string;
+  getGrowthSaveStatus(): string;
+  getGrowthRecords(speciesId?: string, includeInactive?: boolean): import("../growth/types.js").FishGrowthRecord[];
 }

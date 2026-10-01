@@ -116,6 +116,80 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
     }
     root.appendChild(plantList);
     root.appendChild(buildAddSelect("plant", descriptor, manager));
+
+    root.appendChild(buildGrowthSection(manager, descriptor));
+  }
+
+  function buildGrowthSection(manager: AquariumManager, descriptor: ReturnType<AquariumManager["getDescriptor"]>) {
+    const section = document.createElement("section");
+    section.className = "growth-section";
+    const title = document.createElement("h3");
+    title.textContent = t("growthTitle");
+    section.appendChild(title);
+
+    const stats = manager.getGrowthStats();
+    const summary = document.createElement("p");
+    summary.className = "growth-summary";
+    summary.textContent = `${t("growthTotal")}: ${stats.activeCount} · ${t("growthAverage")}: ${Math.round(stats.averageProgress * 100)}%`;
+    section.appendChild(summary);
+
+    const speciesList = document.createElement("div");
+    speciesList.className = "growth-species-list";
+    for (const entry of descriptor.fish) {
+      const speciesMeta = getFishMeta(entry.speciesId);
+      const speciesStats = manager.getGrowthStats(entry.speciesId);
+      const details = document.createElement("details");
+      details.className = "growth-species";
+      const caption = document.createElement("summary");
+      caption.textContent = `${speciesMeta?.name[getLanguage()] ?? entry.speciesId} · ${speciesStats.activeCount} · ${Math.round(speciesStats.averageProgress * 100)}%`;
+      details.appendChild(caption);
+      details.addEventListener("toggle", () => {
+        if (!details.open || details.dataset.loaded === "true") return;
+        const list = document.createElement("ul");
+        list.className = "growth-fish-list";
+        for (const record of manager.getGrowthRecords(entry.speciesId)) {
+          const item = document.createElement("li");
+          item.textContent = `${record.fishId.slice(0, 8)} · ${t(`growthStage_${record.stage}`)} · ${Math.round(record.growthProgress * 100)}% · ${Math.floor(record.accumulatedAgeSeconds / 60)}m`;
+          list.appendChild(item);
+        }
+        details.appendChild(list);
+        details.dataset.loaded = "true";
+      });
+      speciesList.appendChild(details);
+    }
+    section.appendChild(speciesList);
+
+    const actions = document.createElement("div");
+    actions.className = "growth-actions";
+    const exportButton = document.createElement("button");
+    exportButton.type = "button";
+    exportButton.textContent = t("growthExport");
+    exportButton.addEventListener("click", () => {
+      const blob = new Blob([manager.exportGrowth()], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "ripple-aquarium-fish-growth.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+    actions.appendChild(exportButton);
+    const resetButton = document.createElement("button");
+    resetButton.type = "button";
+    resetButton.className = "remove-btn";
+    resetButton.textContent = t("growthReset");
+    resetButton.addEventListener("click", () => {
+      if (!window.confirm(t("growthResetConfirm"))) return;
+      manager.resetGrowth();
+      render();
+    });
+    actions.appendChild(resetButton);
+    section.appendChild(actions);
+    const status = document.createElement("small");
+    status.className = "growth-save-status";
+    status.textContent = `${t("growthSaveStatus")}: ${manager.getGrowthSaveStatus()}`;
+    section.appendChild(status);
+    return section;
   }
 
   function renderSpeciesRow(

@@ -243,6 +243,56 @@ canvas {
   margin-bottom: 14px;
 }
 
+.growth-section {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid rgb(226 239 255 / 14%);
+}
+
+.growth-summary,
+.growth-save-status {
+  color: #b9c9d7;
+  font-size: 11px;
+}
+
+.growth-species-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.growth-species {
+  padding: 5px 7px;
+  background: rgb(20 47 58 / 55%);
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.growth-species summary {
+  cursor: pointer;
+  color: #dce6ef;
+}
+
+.growth-fish-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: #b9c9d7;
+}
+
+.growth-actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.growth-actions button {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 7px;
+  font-size: 11px;
+}
+
 h2,
 h3,
 p {

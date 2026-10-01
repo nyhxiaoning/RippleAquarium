@@ -5,6 +5,14 @@ import { getFishMeta, getPlantMeta } from "./species-catalog.js";
 import { getStyleById, listStyleIds } from "./presets.js";
 import { buildAquariumScene } from "./scene-builder.js";
 import { createFishGrowthRegistry } from "../growth/registry.js";
+import { clampOfflineSeconds } from "../growth/calculator.js";
+import {
+  clearGrowthSnapshot,
+  exportGrowthSnapshot,
+  loadGrowthSnapshot,
+  saveGrowthSnapshot,
+} from "../growth/storage.js";
+import type { GrowthLoadResult } from "../growth/storage.js";
 import type {
   AquariumDescriptor,
   AquariumManager,
@@ -62,8 +70,79 @@ export function createAquariumManager(
   let descriptor = cloneDescriptor(initialDescriptor);
   let handle: AquariumSceneHandle | null = null;
   const growthRegistry = createFishGrowthRegistry();
+  // Keep the manager immediately usable for callers that inspect it before
+  // init(); init() may replace these records with a persisted snapshot.
   for (const entry of descriptor.fish) growthRegistry.activate(entry.speciesId, entry.count);
+  let growthSaveStatus = "empty";
+  let growthSaveTimer: ReturnType<typeof setTimeout> | null = null;
   const listeners = new Set<(descriptor: AquariumDescriptor) => void>();
+
+  function reconcileGrowth() {
+    const desired = new Map(descriptor.fish.map((entry) => [entry.speciesId, entry.count]));
+    const species = new Set([...desired.keys(), ...growthRegistry.getRecords(undefined, true).map((record) => record.speciesId)]);
+    for (const speciesId of species) {
+      const target = desired.get(speciesId) ?? 0;
+      const current = growthRegistry.getStats(speciesId).activeCount;
+      if (target > current) growthRegistry.activate(speciesId, target - current);
+      else if (target < current) growthRegistry.deactivate(speciesId, current - target);
+    }
+  }
+
+  function markGrowthDirty() {
+    growthSaveStatus = "unsaved";
+    if (growthSaveTimer !== null) return;
+    growthSaveTimer = setTimeout(() => {
+      growthSaveTimer = null;
+      saveGrowth();
+    }, 10_000);
+  }
+
+  function storageOrNull(): Storage | null {
+    try {
+      return typeof localStorage === "undefined" ? null : localStorage;
+    } catch {
+      return null;
+    }
+  }
+
+  function loadGrowth(): GrowthLoadResult {
+    const storage = storageOrNull();
+    if (!storage) {
+      reconcileGrowth();
+      growthSaveStatus = "unavailable";
+      return { snapshot: null, status: "unavailable" };
+    }
+    const result = loadGrowthSnapshot(storage, Date.now());
+    if (result.snapshot) {
+      growthRegistry.replace(result.snapshot);
+      const elapsed = clampOfflineSeconds(result.snapshot.savedAt, Date.now(), 24 * 60 * 60);
+      growthRegistry.applyOffline(elapsed);
+    }
+    reconcileGrowth();
+    growthSaveStatus = result.status;
+    return result;
+  }
+
+  function saveGrowth(): "saved" | "unavailable" {
+    const storage = storageOrNull();
+    if (!storage) {
+      growthSaveStatus = "error";
+      return "unavailable";
+    }
+    growthSaveStatus = "saving";
+    const result = saveGrowthSnapshot(storage, growthRegistry.snapshot(Date.now()));
+    growthSaveStatus = result === "saved" ? "saved" : "error";
+    return result;
+  }
+
+  function resetGrowth(): "cleared" | "unavailable" {
+    const storage = storageOrNull();
+    const result = storage ? clearGrowthSnapshot(storage) : "unavailable";
+    growthRegistry.replace({ schemaVersion: 1, savedAt: Date.now(), records: [] });
+    reconcileGrowth();
+    growthSaveStatus = result === "cleared" ? "saved" : "error";
+    return result;
+  }
 
   function notify() {
     for (const cb of listeners) cb(descriptor);
@@ -114,6 +193,7 @@ export function createAquariumManager(
     update(time, dt) {
       if (handle) handle.update(time, dt);
       else if (dt > 0) growthRegistry.advanceOnline(dt);
+      if (dt > 0) markGrowthDirty();
     },
     on(event, cb) {
       if (event !== "change") return () => {};
@@ -218,17 +298,26 @@ export function createAquariumManager(
       handle?.refreshFishMeshes();
     },
     async init() {
+      loadGrowth();
       await rebuild();
       // Wait for the high-detail fish models before resolving so callers can
       // hide the loading overlay at the right moment.
       await this.loadModels();
     },
     dispose() {
+      if (growthSaveTimer !== null) clearTimeout(growthSaveTimer);
+      growthSaveTimer = null;
       handle?.dispose();
       handle = null;
       listeners.clear();
     },
     getGrowthRegistry: () => growthRegistry,
     getGrowthStats: (speciesId) => growthRegistry.getStats(speciesId),
+    loadGrowth,
+    saveGrowth,
+    resetGrowth,
+    exportGrowth: () => exportGrowthSnapshot(growthRegistry.snapshot(Date.now())),
+    getGrowthSaveStatus: () => growthSaveStatus,
+    getGrowthRecords: (speciesId, includeInactive = false) => growthRegistry.getRecords(speciesId, includeInactive),
   };
 }
