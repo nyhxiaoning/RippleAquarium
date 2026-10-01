@@ -23,7 +23,7 @@ export function createScene() {
   return scene;
 }
 
-export function addLighting(scene) {
+export function addLighting(scene, halfSize = aquariumHalfSize) {
   const hemiBaseIntensity = 2.6;
   const sunBaseIntensity = 2.2;
   const hemiLight = new THREE.HemisphereLight(
@@ -34,15 +34,17 @@ export function addLighting(scene) {
   scene.add(hemiLight);
 
   const sun = new THREE.DirectionalLight(0xffffff, sunBaseIntensity);
-  sun.position.set(0.8, 15, 0.6);
+  sun.position.set(0.8, halfSize.y + 7, 0.6);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -18;
-  sun.shadow.camera.right = 18;
-  sun.shadow.camera.top = 18;
-  sun.shadow.camera.bottom = -18;
+  const horizontalShadowExtent = Math.max(halfSize.x, halfSize.z) + 4;
+  const verticalShadowExtent = halfSize.y + 4;
+  sun.shadow.camera.left = -horizontalShadowExtent;
+  sun.shadow.camera.right = horizontalShadowExtent;
+  sun.shadow.camera.top = verticalShadowExtent;
+  sun.shadow.camera.bottom = -verticalShadowExtent;
   sun.shadow.camera.near = 0.5;
-  sun.shadow.camera.far = 42;
+  sun.shadow.camera.far = halfSize.y + 34;
   sun.shadow.camera.updateProjectionMatrix();
   scene.add(sun);
 
@@ -50,6 +52,17 @@ export function addLighting(scene) {
     setIntensity(multiplier) {
       hemiLight.intensity = hemiBaseIntensity * multiplier;
       sun.intensity = sunBaseIntensity * multiplier;
+    },
+    resize(nextHalfSize) {
+      sun.position.y = nextHalfSize.y + 7;
+      const horizontalShadowExtent = Math.max(nextHalfSize.x, nextHalfSize.z) + 4;
+      const verticalShadowExtent = nextHalfSize.y + 4;
+      sun.shadow.camera.left = -horizontalShadowExtent;
+      sun.shadow.camera.right = horizontalShadowExtent;
+      sun.shadow.camera.top = verticalShadowExtent;
+      sun.shadow.camera.bottom = -verticalShadowExtent;
+      sun.shadow.camera.far = nextHalfSize.y + 34;
+      sun.shadow.camera.updateProjectionMatrix();
     },
   };
 }
@@ -145,6 +158,7 @@ export function createAquariumShell(scene, renderer, halfSize) {
       floorEdges.position.copy(floor.position);
 
       waterSurface.resize(nextHalfSize);
+      bubbles.resize?.(nextHalfSize);
     },
     dispose() {
       aquariumGlass.geometry.dispose();
@@ -211,19 +225,26 @@ function addBubbleColumns(scene, halfSize) {
   const quaternion = new THREE.Quaternion();
   const starts = [];
 
-  for (let i = 0; i < count; i += 1) {
-    const column = i % 3;
-    const ring = Math.floor(i / 3);
-    const baseX = [-8.4, 0.2, 7.8][column];
-    const baseZ = [-5.8, 6.3, -4.7][column];
-    starts.push({
-      x: baseX + Math.sin(ring * 1.7) * 0.42,
-      z: baseZ + Math.cos(ring * 1.31) * 0.36,
-      phase: (i * 0.137) % 1,
-      size: 0.58 + ((i * 37) % 29) / 50,
-      speed: 0.045 + ((i * 17) % 13) * 0.003,
-    });
+  function rebuildStarts(bounds) {
+    starts.length = 0;
+    const xFractions = [-0.76, 0.02, 0.71];
+    const zFractions = [-0.68, 0.74, -0.55];
+    for (let i = 0; i < count; i += 1) {
+      const column = i % 3;
+      const ring = Math.floor(i / 3);
+      const baseX = xFractions[column] * bounds.x;
+      const baseZ = zFractions[column] * bounds.z;
+      starts.push({
+        x: baseX + Math.sin(ring * 1.7) * Math.min(0.42, bounds.x * 0.03),
+        z: baseZ + Math.cos(ring * 1.31) * Math.min(0.36, bounds.z * 0.03),
+        phase: (i * 0.137) % 1,
+        size: 0.58 + ((i * 37) % 29) / 50,
+        speed: 0.045 + ((i * 17) % 13) * 0.003,
+      });
+    }
   }
+
+  rebuildStarts(halfSize);
 
   function update(time) {
     const floorY = -halfSize.y;
@@ -249,5 +270,11 @@ function addBubbleColumns(scene, halfSize) {
 
   update(0);
 
-  return { update };
+  return {
+    update,
+    resize(nextHalfSize) {
+      halfSize = nextHalfSize;
+      rebuildStarts(nextHalfSize);
+    },
+  };
 }

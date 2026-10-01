@@ -7,11 +7,11 @@ const CAMERA_MODE = {
   fish: "fish",
 };
 
-const DEFAULT_HALF_SIZE = new THREE.Vector3(11, 6.6, 8.5);
-const DEFAULT_CAMERA_POSITION = new THREE.Vector3(0, 9.8, 27);
-const DEFAULT_TARGET = new THREE.Vector3(0, 1.7, 0);
-const DEFAULT_MAX_DISTANCE = 38;
-const DEFAULT_MIN_DISTANCE = 6;
+const DEFAULT_HALF_SIZE = new THREE.Vector3(14, 8, 11);
+const DEFAULT_CAMERA_POSITION = new THREE.Vector3(0, 11.6, 34);
+const DEFAULT_TARGET = new THREE.Vector3(0, 1.9, 0);
+const DEFAULT_MAX_DISTANCE = 46;
+const DEFAULT_MIN_DISTANCE = 7;
 
 const FISH_CAMERA_POSITION_RESPONSE = 10;
 const FISH_CAMERA_DIRECTION_RESPONSE = 5;
@@ -21,15 +21,15 @@ const fallbackUp = new THREE.Vector3(1, 0, 0);
 
 export function createCameraRig(renderer) {
   const orbitCamera = new THREE.PerspectiveCamera(55, 1, 0.1, 120);
-  orbitCamera.position.set(0, 9.8, 27);
+  orbitCamera.position.copy(DEFAULT_CAMERA_POSITION);
 
   const fishCamera = new THREE.PerspectiveCamera(74, 1, 0.03, 90);
 
   const controls = new OrbitControls(orbitCamera, renderer.domElement);
   controls.enableDamping = true;
-  controls.target.set(0, 1.7, 0);
-  controls.maxDistance = 38;
-  controls.minDistance = 6;
+  controls.target.copy(DEFAULT_TARGET);
+  controls.maxDistance = DEFAULT_MAX_DISTANCE;
+  controls.minDistance = DEFAULT_MIN_DISTANCE;
 
   const pose = {
     position: new THREE.Vector3(),

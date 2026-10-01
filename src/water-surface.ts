@@ -162,6 +162,7 @@ void main() {
 `;
 
 export function createWaterSurface(renderer) {
+  const waterBounds = new THREE.Vector2(aquariumSize.x, aquariumSize.z);
   const impacts = new Float32Array(MAX_IMPACTS * 4);
   // Pooled impact holders (plain number fields) so queueImpact runs without
   // per-call heap allocation — it can fire once per near-surface fish/frame.
@@ -270,8 +271,8 @@ export function createWaterSurface(renderer) {
 
   function isInsideWater(point) {
     return (
-      Math.abs(point.x) <= aquariumSize.x * 0.5 &&
-      Math.abs(point.z) <= aquariumSize.z * 0.5
+      Math.abs(point.x) <= waterBounds.x * 0.5 &&
+      Math.abs(point.z) <= waterBounds.y * 0.5
     );
   }
 
@@ -334,6 +335,8 @@ export function createWaterSurface(renderer) {
     mesh.geometry.dispose();
     mesh.geometry = new THREE.PlaneGeometry(halfSize.x * 2, halfSize.z * 2, 180, 140);
     simulationMaterial.uniforms.uWorldSize.value.set(halfSize.x * 2, halfSize.z * 2);
+    mesh.position.y = halfSize.y - 0.72;
+    waterBounds.set(halfSize.x * 2, halfSize.z * 2);
   }
 
   return {

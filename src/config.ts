@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import type { ExclusionZone, FishConfig, Obstacle, SimulationSettings } from "./types.js";
 
-export const aquariumHalfSize = new THREE.Vector3(11, 6.6, 8.5);
+// The default scene is intentionally roomy enough for layered habitats and
+// the additional species introduced by the ecology expansion.
+export const aquariumHalfSize = new THREE.Vector3(14, 8, 11);
 export const aquariumSize = aquariumHalfSize.clone().multiplyScalar(2);
 export const aquariumFloorY = -aquariumHalfSize.y;
 export const waterLevelY = aquariumHalfSize.y - 0.72;

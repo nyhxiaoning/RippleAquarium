@@ -110,7 +110,7 @@ export async function buildAquariumScene(
   let waterLevelY = halfSize.y - 0.72;
   let aquariumFloorY = -halfSize.y;
 
-  const lighting = addLighting(root);
+  const lighting = addLighting(root, halfSize);
   lighting.setIntensity(descriptor.theme.lighting.hemiIntensity);
 
   const shell = createAquariumShell(root, renderer, halfSize);
@@ -219,6 +219,7 @@ export async function buildAquariumScene(
     aquariumFloorY = -halfSize.y;
     speciesDeps.waterLevelY = waterLevelY;
     speciesDeps.aquariumFloorY = aquariumFloorY;
+    lighting.resize?.(halfSize);
     shell.resize(halfSize);
     for (const school of fishSchools.values()) {
       school.resize?.(halfSize);
