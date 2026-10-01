@@ -1,6 +1,10 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { fishConfig } from "./config.js";
+import {
+  createProceduralFishModel,
+  isProceduralFishKey,
+} from "./procedural-species.js";
 import type { GLTF } from "three/addons/loaders/GLTFLoader.js";
 import type { FishModelInstance } from "../types.js";
 
@@ -119,6 +123,9 @@ export function createFishModelInstance(variantIndex = 0): FishModelInstance {
 }
 
 export function createFishModelInstanceByKey(key: string): FishModelInstance {
+  if (isProceduralFishKey(key)) {
+    return createProceduralFishModel(key);
+  }
   const fishModel = fishModels.find((model) => model.key === key) ?? fishModels[0];
   return createFishModelInstanceFromModel(fishModel);
 }

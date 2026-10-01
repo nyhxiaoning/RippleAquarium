@@ -12,6 +12,7 @@ import type {
   SchoolHandle,
   SpeciesCreateDeps,
 } from "./types.js";
+import type { HabitatLayer } from "./habitat.js";
 
 export interface FishCatalogEntry {
   id: string;
@@ -19,6 +20,14 @@ export interface FishCatalogEntry {
   kind: "schooling" | "bottom";
   maxCount: number;
   defaultCount: number;
+  /** Procedural/GLB model key used by the shared instanced renderer. */
+  modelKey?: string;
+  /** Preferred habitat, consumed by the habitat-aware school task. */
+  habitatLayer?: HabitatLayer;
+  /** Species-specific boids speed multiplier. */
+  defaultSpeedScale?: number;
+  /** Species-specific adult size multiplier. */
+  growthScale?: number;
 }
 
 export interface PlantCatalogEntry {
@@ -29,10 +38,13 @@ export interface PlantCatalogEntry {
 }
 
 export const FISH_CATALOG: FishCatalogEntry[] = [
-  { id: "sardine", name: { zh: "沙丁鱼", en: "Sardine" }, kind: "schooling", maxCount: 260, defaultCount: 60 },
-  { id: "koi", name: { zh: "锦鲤", en: "Koi" }, kind: "schooling", maxCount: 120, defaultCount: 24 },
-  { id: "clownfish", name: { zh: "小丑鱼", en: "Clownfish" }, kind: "bottom", maxCount: 40, defaultCount: 18 },
-  { id: "starfish", name: { zh: "海星", en: "Starfish" }, kind: "bottom", maxCount: 30, defaultCount: 14 },
+  { id: "sardine", name: { zh: "沙丁鱼", en: "Sardine" }, kind: "schooling", maxCount: 260, defaultCount: 60, modelKey: "cartoon", habitatLayer: "middle", defaultSpeedScale: 1, growthScale: 1 },
+  { id: "koi", name: { zh: "锦鲤", en: "Koi" }, kind: "schooling", maxCount: 120, defaultCount: 24, modelKey: "koi", habitatLayer: "middle", defaultSpeedScale: 0.82, growthScale: 1.08 },
+  { id: "clownfish", name: { zh: "小丑鱼", en: "Clownfish" }, kind: "bottom", maxCount: 40, defaultCount: 18, modelKey: "clown", habitatLayer: "reef", defaultSpeedScale: 0.45, growthScale: 0.78 },
+  { id: "starfish", name: { zh: "海星", en: "Starfish" }, kind: "bottom", maxCount: 30, defaultCount: 14, modelKey: "starfish", habitatLayer: "lower", defaultSpeedScale: 0.2, growthScale: 0.9 },
+  { id: "angelfish", name: { zh: "神仙鱼", en: "Angelfish" }, kind: "schooling", maxCount: 60, defaultCount: 12, modelKey: "angelfish", habitatLayer: "middle", defaultSpeedScale: 0.82, growthScale: 1.05 },
+  { id: "blue-tang", name: { zh: "蓝吊鱼", en: "Blue Tang" }, kind: "schooling", maxCount: 50, defaultCount: 10, modelKey: "blue-tang", habitatLayer: "upper", defaultSpeedScale: 1.08, growthScale: 0.98 },
+  { id: "pufferfish", name: { zh: "河豚", en: "Pufferfish" }, kind: "schooling", maxCount: 24, defaultCount: 6, modelKey: "pufferfish", habitatLayer: "lower", defaultSpeedScale: 0.52, growthScale: 1.12 },
 ];
 
 export const PLANT_CATALOG: PlantCatalogEntry[] = [
@@ -83,6 +95,12 @@ export function createFishSchool(
     }
     case "starfish":
       return createStarfishSchool(count, deps, fishIds);
+    case "angelfish":
+      return createBoidsSchool("angelfish", "angelfish", count, deps, 60, fishIds);
+    case "blue-tang":
+      return createBoidsSchool("blue-tang", "blue-tang", count, deps, 50, fishIds);
+    case "pufferfish":
+      return createBoidsSchool("pufferfish", "pufferfish", count, deps, 24, fishIds);
     default:
       return null;
   }

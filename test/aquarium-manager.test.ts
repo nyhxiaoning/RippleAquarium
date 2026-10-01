@@ -68,7 +68,7 @@ describe("species catalog", () => {
   it("lists the expected fish and plant species", () => {
     assert.deepStrictEqual(
       FISH_CATALOG.map((m) => m.id),
-      ["sardine", "koi", "clownfish", "starfish"],
+      ["sardine", "koi", "clownfish", "starfish", "angelfish", "blue-tang", "pufferfish"],
     );
     assert.deepStrictEqual(
       PLANT_CATALOG.map((m) => m.id),

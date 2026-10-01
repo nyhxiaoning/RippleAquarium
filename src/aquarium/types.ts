@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import type { ExclusionZone, FishState, Obstacle, SimulationSettings } from "../types.js";
 import type { FishGrowthRegistry } from "../growth/registry.js";
+import type { EcologyEntry, EcologyKind } from "../ecology/types.js";
+import type { HabitatLayer } from "./habitat.js";
 
 /** Plain serializable 3D vector (no Three.js dependency for presets/tests). */
 export interface Vec3 {
@@ -31,6 +33,9 @@ export interface DecorItem {
 export interface FishEntry {
   speciesId: string;
   count: number;
+  /** Optional catalog hints kept out of persisted presets for compatibility. */
+  modelKey?: string;
+  habitatLayer?: HabitatLayer;
 }
 
 export interface PlantEntry {
@@ -47,6 +52,8 @@ export interface AquariumDescriptor {
   decor: DecorItem[];
   fish: FishEntry[];
   plants: PlantEntry[];
+  /** Optional for backwards compatibility with older presets. */
+  ecology?: EcologyEntry[];
 }
 
 export type AquariumStyle = AquariumDescriptor;
@@ -59,6 +66,10 @@ export interface SpeciesMeta {
   kind: "schooling" | "bottom" | "anchored";
   maxCount: number;
   defaultCount: number;
+  modelKey?: string;
+  habitatLayer?: HabitatLayer;
+  defaultSpeedScale?: number;
+  growthScale?: number;
 }
 
 /** Minimal structural view of a coral reef, needed by the clownfish school. */
@@ -121,9 +132,14 @@ export interface AquariumSceneHandle {
   setPlantCount(speciesId: string, count: number): void;
   addPlantSpecies(speciesId: string, count?: number): Promise<SchoolHandle | null>;
   removePlantSpecies(speciesId: string): void;
+  setEcologyCount(speciesId: EcologyKind, count: number): void;
+  addEcologySpecies(speciesId: EcologyKind, count?: number): SchoolHandle | null;
+  removeEcologySpecies(speciesId: EcologyKind): void;
   getFishCount(speciesId: string): number;
   getActiveFish(): FishEntry[];
   getActivePlants(): PlantEntry[];
+  getEcologyCount(speciesId: EcologyKind): number;
+  getActiveEcology(): EcologyEntry[];
   getWaterLevelY(): number;
   getAquariumFloorY(): number;
   getHalfSize(): THREE.Vector3;
@@ -149,6 +165,11 @@ export interface AquariumManager {
   addPlantSpecies(speciesId: string, count?: number): Promise<boolean>;
   removePlantSpecies(speciesId: string): boolean;
   setPlantCount(speciesId: string, count: number): boolean;
+  addEcologySpecies(speciesId: EcologyKind, count?: number): boolean;
+  removeEcologySpecies(speciesId: EcologyKind): boolean;
+  setEcologyCount(speciesId: EcologyKind, count: number): boolean;
+  getEcologyCount(speciesId: EcologyKind): number;
+  getActiveEcology(): EcologyEntry[];
   getDescriptor(): AquariumDescriptor;
   getStyleIds(): string[];
   getHalfSize(): Vec3;

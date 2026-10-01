@@ -28,7 +28,7 @@ export function createFishMesh(capacity, variantIndex = 0) {
   return createFishMeshFromModel(capacity, geometry, material, useAppearanceVariants, renderScale);
 }
 
-export function createFishMeshByKey(capacity, modelKey) {
+export function createFishMeshByKey(capacity: number, modelKey: string): THREE.InstancedMesh {
   const { geometry, material, useAppearanceVariants, renderScale } = createFishModelInstanceByKey(modelKey);
   return createFishMeshFromModel(capacity, geometry, material, useAppearanceVariants, renderScale);
 }
