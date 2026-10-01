@@ -15,6 +15,8 @@ export interface ThemeObjectHandle {
   update(time: number, dt: number): void;
   resize(halfSize: THREE.Vector3): void;
   dispose(): void;
+  /** Optional anchor for future character interactions and collectibles. */
+  getInteractionAnchor?(): THREE.Object3D;
 }
 
 /** Serializable placement and visibility data for one theme object. */

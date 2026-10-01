@@ -196,6 +196,63 @@ canvas {
   font-size: 12px;
 }
 
+.theme-section {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid rgb(226 239 255 / 14%);
+}
+
+.theme-animation-toggle,
+.theme-object-toggle {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: #b9c9d7;
+  font-size: 12px;
+  white-space: normal;
+}
+
+.theme-animation-toggle input,
+.theme-object-toggle input {
+  width: auto;
+  accent-color: #61d394;
+}
+
+.theme-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.theme-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 1.35fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: rgb(20 47 58 / 55%);
+}
+
+.theme-row.theme-prop {
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 1.35fr);
+}
+
+.theme-scale-control {
+  display: grid;
+  grid-template-columns: 1fr 40px;
+  align-items: center;
+  gap: 7px;
+}
+
+.theme-scale-control output {
+  font-size: 11px;
+}
+
 .style-chips {
   display: flex;
   flex-wrap: wrap;

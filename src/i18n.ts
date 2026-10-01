@@ -82,6 +82,10 @@ const translations = {
     weather_cloudy: "多云",
     weather_rain: "降雨",
     weather_storm: "暴风雨",
+    themeTitle: "海绵宝宝主题",
+    themeAnimation: "主题角色待机动画",
+    themeVisibility: "显示",
+    themeScale: "主题缩放",
   },
   en: {
     title: "Ripple Aquarium",
@@ -164,6 +168,10 @@ const translations = {
     weather_cloudy: "Cloudy",
     weather_rain: "Rain",
     weather_storm: "Storm",
+    themeTitle: "SpongeBob Theme",
+    themeAnimation: "Theme idle animation",
+    themeVisibility: "Show",
+    themeScale: "Theme scale",
   },
 };
 
@@ -189,7 +197,9 @@ export function setLanguage(language: string | null | undefined): boolean {
   if (!isLanguage(language)) return false;
 
   currentLanguage = language;
-  localStorage.setItem(STORAGE_KEY, language);
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem(STORAGE_KEY, language);
+  }
   return true;
 }
 
@@ -223,8 +233,8 @@ function setElementText(element: HTMLElement, text: string): void {
 }
 
 function readInitialLanguage(): Language {
-  const saved = localStorage.getItem(STORAGE_KEY);
+  const saved = typeof localStorage === "undefined" ? null : localStorage.getItem(STORAGE_KEY);
   if (isLanguage(saved)) return saved;
 
-  return navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en";
+  return typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en";
 }

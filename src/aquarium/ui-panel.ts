@@ -2,6 +2,7 @@ import { FISH_CATALOG, PLANT_CATALOG, getFishMeta, getPlantMeta } from "./specie
 import { ECOLOGY_CATALOG, getEcologyMeta } from "../ecology/catalog.js";
 import type { EcologyKind } from "../ecology/types.js";
 import { getStyleById, listStyleIds } from "./presets.js";
+import { getThemeMeta } from "../theme/catalog.js";
 import { getLanguage, t } from "../i18n.js";
 import type { AquariumManager } from "./types.js";
 import { WEATHER_KINDS, type WeatherKind } from "../weather/types.js";
@@ -112,6 +113,7 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
     root.appendChild(buildAddSelect("fish", descriptor, manager));
 
     root.appendChild(buildWeatherSection(manager));
+    root.appendChild(buildThemeSection(manager));
 
     // Plant species
     const plantTitle = document.createElement("h3");
@@ -199,6 +201,79 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
         if (root.isConnected) updateStatus();
       }, 1000);
     }
+    return section;
+  }
+
+  function buildThemeSection(manager: AquariumManager) {
+    const section = document.createElement("section");
+    section.className = "theme-section";
+    section.setAttribute("data-theme-panel", "true");
+
+    const title = document.createElement("h3");
+    title.textContent = t("themeTitle");
+    section.appendChild(title);
+
+    const animationLabel = document.createElement("label");
+    animationLabel.className = "theme-animation-toggle";
+    const animationInput = document.createElement("input");
+    animationInput.type = "checkbox";
+    animationInput.checked = manager.getThemeAnimationEnabled();
+    animationInput.setAttribute("data-theme-animation", "true");
+    animationInput.addEventListener("change", () => {
+      manager.setThemeAnimationEnabled(animationInput.checked);
+    });
+    animationLabel.append(animationInput, document.createTextNode(t("themeAnimation")));
+    section.appendChild(animationLabel);
+
+    const entries = manager.getThemeEntries();
+    const list = document.createElement("div");
+    list.className = "theme-list";
+    for (const entry of entries) {
+      const meta = getThemeMeta(entry.id);
+      const row = document.createElement("div");
+      row.className = `theme-row theme-${entry.kind}`;
+      row.dataset.themeId = entry.id;
+
+      const toggleLabel = document.createElement("label");
+      toggleLabel.className = "theme-object-toggle";
+      const toggle = document.createElement("input");
+      toggle.type = "checkbox";
+      toggle.checked = entry.enabled;
+      toggle.dataset.themeToggleId = entry.id;
+      toggle.setAttribute("aria-label", `${t("themeVisibility")} ${meta?.name[getLanguage()] ?? entry.id}`);
+      toggle.addEventListener("change", () => {
+        manager.setThemeEnabled(entry.id, toggle.checked);
+      });
+      const name = document.createElement("span");
+      name.textContent = meta?.name[getLanguage()] ?? entry.id;
+      toggleLabel.append(toggle, name);
+      row.appendChild(toggleLabel);
+
+      // Character scale is always useful. Large props are deliberately not
+      // given a slider while hidden (the small-tank preset uses this rule).
+      if (entry.kind === "character" || entry.enabled) {
+        const scale = document.createElement("input");
+        scale.type = "range";
+        scale.min = "0.5";
+        scale.max = "1.25";
+        scale.step = "0.05";
+        scale.value = String(entry.scale);
+        scale.dataset.themeScaleId = entry.id;
+        scale.setAttribute("aria-label", `${t("themeScale")} ${meta?.name[getLanguage()] ?? entry.id}`);
+        const output = document.createElement("output");
+        output.value = `${entry.scale.toFixed(2)}×`;
+        scale.addEventListener("input", () => {
+          output.value = `${Number(scale.value).toFixed(2)}×`;
+          manager.setThemeScale(entry.id, Number(scale.value));
+        });
+        const scaleControl = document.createElement("div");
+        scaleControl.className = "theme-scale-control";
+        scaleControl.append(scale, output);
+        row.appendChild(scaleControl);
+      }
+      list.appendChild(row);
+    }
+    section.appendChild(list);
     return section;
   }
 

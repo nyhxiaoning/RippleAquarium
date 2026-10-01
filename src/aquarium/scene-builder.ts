@@ -561,6 +561,15 @@ export async function buildAquariumScene(
     root.clear();
   }
 
+  function getThemeInteractionAnchor(id: string): THREE.Vector3 | null {
+    const handle = themeHandles.get(id);
+    if (!handle) return null;
+    const anchor = handle.getInteractionAnchor?.() ?? handle.group;
+    const position = new THREE.Vector3();
+    anchor.getWorldPosition(position);
+    return position;
+  }
+
   return {
     root,
     update,
@@ -622,6 +631,8 @@ export async function buildAquariumScene(
     setThemeEnabled,
     setThemeAnimationEnabled,
     setThemeScale,
+    getThemeInteractionAnchor,
+    onThemeInteraction: undefined,
     setWeatherEffects(effects, state) {
       weatherEffects = effects;
       if (state) weatherState = Object.freeze({ ...state });

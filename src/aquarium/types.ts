@@ -171,11 +171,18 @@ export interface AquariumSceneHandle {
   setThemeAnimationEnabled(enabled: boolean): void;
   /** Resize a themed object in place while preserving its placement. */
   setThemeScale(id: string, scale: number): boolean;
+  /** Return the world-space anchor reserved for future character interactions. */
+  getThemeInteractionAnchor(id: string): THREE.Vector3 | null;
+  /** Optional future interaction callback; no pointer events invoke it yet. */
+  onThemeInteraction?: ThemeInteractionCallback;
   setWeatherEffects(effects: WeatherEffects, state?: WeatherState): void;
   getWeatherState(): WeatherState;
 }
 
 export type ManagerEvent = "change";
+
+/** Runtime-only hook reserved for future theme click/dialog interactions. */
+export type ThemeInteractionCallback = (id: string, anchor: THREE.Vector3) => void;
 
 /** Public interface of the aquarium project manager. */
 export interface AquariumManager {
@@ -196,7 +203,10 @@ export interface AquariumManager {
   getThemeEntries(): ThemeEntry[];
   setThemeEnabled(id: string, enabled: boolean): boolean;
   setThemeAnimationEnabled(enabled: boolean): void;
+  getThemeAnimationEnabled(): boolean;
   setThemeScale(id: string, scale: number): boolean;
+  getThemeInteractionAnchor(id: string): THREE.Vector3 | null;
+  setThemeInteractionCallback(callback?: ThemeInteractionCallback): void;
   getStyleIds(): string[];
   getHalfSize(): Vec3;
   getWaterLevelY(): number;

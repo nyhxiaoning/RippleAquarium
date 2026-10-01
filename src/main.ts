@@ -34,6 +34,11 @@ const manager = createAquariumManager(DEFAULT_STYLE, {
   cameraRig,
 });
 
+// Theme characters expose interaction anchors for a later click/dialog
+// feature. Keep the hook intentionally inert until that feature is designed;
+// no pointer listener invokes it in this release.
+manager.setThemeInteractionCallback((_id, _anchor) => {});
+
 const controls = {
   count: createControl("#count", "#count-value"),
   koiCount: createControl("#koi-count", "#koi-count-value"),

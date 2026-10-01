@@ -281,6 +281,10 @@ export function createThemeCharacter(
   }
 
   let disposed = false;
+  const interactionAnchor = new THREE.Object3D();
+  interactionAnchor.name = `${id}-interaction-anchor`;
+  interactionAnchor.position.set(0, id === "squidward" ? 1.7 : 1.55, 0.72);
+  group.add(interactionAnchor);
   const handle: ThemeCharacterHandle = {
     group,
     update(time: number, _dt: number) {
@@ -299,6 +303,9 @@ export function createThemeCharacter(
       animationEnabled = Boolean(enabled);
       group.userData.animationEnabled = animationEnabled;
       if (!animationEnabled) handle.update(0, 0);
+    },
+    getInteractionAnchor() {
+      return interactionAnchor;
     },
     dispose() {
       if (disposed) return;

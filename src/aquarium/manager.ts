@@ -19,6 +19,7 @@ import type {
   AquariumDescriptor,
   AquariumManager,
   AquariumSceneHandle,
+  ThemeInteractionCallback,
 } from "./types.js";
 import { createWeatherController } from "../weather/controller.js";
 import type { WeatherKind } from "../weather/types.js";
@@ -92,6 +93,7 @@ export function createAquariumManager(
   let growthSaveStatus = "empty";
   let growthSaveTimer: ReturnType<typeof setTimeout> | null = null;
   let themeAnimationEnabled = true;
+  let themeInteractionCallback: ThemeInteractionCallback | undefined;
   const listeners = new Set<(descriptor: AquariumDescriptor) => void>();
 
   function reconcileGrowth() {
@@ -171,6 +173,8 @@ export function createAquariumManager(
       handle.dispose();
     }
     handle = await buildAquariumScene(descriptor, { renderer, scene, growthRegistry });
+    handle.setThemeAnimationEnabled(themeAnimationEnabled);
+    handle.onThemeInteraction = themeInteractionCallback;
     handle.setWeatherEffects(weather.getEffects(), weather.getState());
     cameraRig.configure(
       new THREE.Vector3(
@@ -192,23 +196,28 @@ export function createAquariumManager(
       const entry = descriptor.themeEntries?.find((item) => item.id === id);
       if (!entry) return false;
       entry.enabled = Boolean(enabled);
+      handle?.setThemeEnabled(id, entry.enabled);
       notify();
       return true;
     },
     setThemeAnimationEnabled(enabled: boolean) {
       themeAnimationEnabled = Boolean(enabled);
-      // The live scene handle will consume this runtime setting when theme
-      // lifecycle integration lands. Keep the manager event contract in place
-      // so controls can rerender without touching growth/weather state.
-      void themeAnimationEnabled;
+      handle?.setThemeAnimationEnabled(themeAnimationEnabled);
       notify();
     },
+    getThemeAnimationEnabled: () => themeAnimationEnabled,
     setThemeScale(id: string, scale: number) {
       const entry = descriptor.themeEntries?.find((item) => item.id === id);
       if (!entry || !Number.isFinite(scale)) return false;
       entry.scale = Math.max(0, scale);
+      handle?.setThemeScale(id, entry.scale);
       notify();
       return true;
+    },
+    getThemeInteractionAnchor: (id: string) => handle?.getThemeInteractionAnchor(id) ?? null,
+    setThemeInteractionCallback(callback?: ThemeInteractionCallback) {
+      themeInteractionCallback = callback;
+      if (handle) handle.onThemeInteraction = callback;
     },
     getStyleIds: listStyleIds,
     getHalfSize: () => descriptor.aquarium.halfSize,
