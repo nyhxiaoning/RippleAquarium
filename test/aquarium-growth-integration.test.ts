@@ -12,7 +12,7 @@ describe("aquarium manager growth integration", () => {
   it("activates one record for every initial fish", () => {
     const manager = createAquariumManager(DEFAULT_STYLE, mockDeps);
     const registry = manager.getGrowthRegistry();
-    assert.strictEqual(registry.getStats().activeCount, 102);
+    assert.strictEqual(registry.getStats().activeCount, 130);
     assert.strictEqual(registry.getStats("sardine").activeCount, 60);
   });
 

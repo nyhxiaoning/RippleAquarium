@@ -41,8 +41,17 @@ export const DEFAULT_STYLE: AquariumStyle = {
     { speciesId: "sardine", count: 60 },
     { speciesId: "koi", count: 24 },
     { speciesId: "clownfish", count: 18 },
+    { speciesId: "angelfish", count: 12 },
+    { speciesId: "blue-tang", count: 10 },
+    { speciesId: "pufferfish", count: 6 },
   ],
   plants: [{ speciesId: "coral", count: 100 }],
+  ecology: [
+    { speciesId: "anemone", count: 8 },
+    { speciesId: "urchin", count: 8 },
+    { speciesId: "shell", count: 16 },
+    { speciesId: "jellyfish", count: 6 },
+  ],
 };
 
 export const CORAL_REEF_STYLE: AquariumStyle = {
@@ -76,10 +85,19 @@ export const CORAL_REEF_STYLE: AquariumStyle = {
     { speciesId: "koi", count: 30 },
     { speciesId: "clownfish", count: 24 },
     { speciesId: "starfish", count: 14 },
+    { speciesId: "angelfish", count: 16 },
+    { speciesId: "blue-tang", count: 14 },
+    { speciesId: "pufferfish", count: 8 },
   ],
   plants: [
     { speciesId: "coral", count: 160 },
     { speciesId: "seaweed", count: 26 },
+  ],
+  ecology: [
+    { speciesId: "anemone", count: 14 },
+    { speciesId: "urchin", count: 12 },
+    { speciesId: "shell", count: 24 },
+    { speciesId: "jellyfish", count: 8 },
   ],
 };
 
@@ -107,8 +125,17 @@ export const DEEP_SEA_STYLE: AquariumStyle = {
     { speciesId: "sardine", count: 40 },
     { speciesId: "koi", count: 10 },
     { speciesId: "clownfish", count: 8 },
+    { speciesId: "angelfish", count: 6 },
+    { speciesId: "blue-tang", count: 5 },
+    { speciesId: "pufferfish", count: 3 },
   ],
   plants: [{ speciesId: "coral", count: 60 }],
+  ecology: [
+    { speciesId: "anemone", count: 6 },
+    { speciesId: "urchin", count: 4 },
+    { speciesId: "shell", count: 8 },
+    { speciesId: "jellyfish", count: 4 },
+  ],
 };
 
 export const SMALL_TANK_STYLE: AquariumStyle = {
@@ -135,8 +162,17 @@ export const SMALL_TANK_STYLE: AquariumStyle = {
     { speciesId: "sardine", count: 18 },
     { speciesId: "koi", count: 6 },
     { speciesId: "clownfish", count: 6 },
+    { speciesId: "angelfish", count: 2 },
+    { speciesId: "blue-tang", count: 1 },
+    { speciesId: "pufferfish", count: 1 },
   ],
   plants: [{ speciesId: "coral", count: 34 }],
+  ecology: [
+    { speciesId: "anemone", count: 2 },
+    { speciesId: "urchin", count: 1 },
+    { speciesId: "shell", count: 4 },
+    { speciesId: "jellyfish", count: 1 },
+  ],
 };
 
 export const AQUARIUM_STYLES: readonly AquariumStyle[] = [

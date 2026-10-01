@@ -49,9 +49,12 @@ A whole tank of fish swims on its own using boids flocking: they gather, turn, a
 
 | Module | Description |
 |--------|-------------|
-| **Fish schools** | Sardines and koi move as independent schools using the same boids behavior, with separate count, speed, and behavior controls |
-| **Clownfish** | Bottom-dwelling movement around the reef and the small water region above it, with coral avoidance |
+| **Fish schools** | Sardines, koi, angelfish, blue tangs, and pufferfish move as independent schools using the same boids behavior, with count, speed, and behavior controls |
+| **Clownfish** | Bottom-dwelling movement around coral and anemone anchors, with decor avoidance |
 | **Fish growth records** | Per-fish IDs, age, growth stage, and body scale with online growth, offline catch-up, and export controls |
+| **Weather** | Clear, cloudy, rain, and storm modes cycle automatically or can be selected manually; weather affects lighting, water, fish speed, and growth |
+| **Marine biodiversity** | Anemones, sea urchins, shells, and jellyfish add layered life alongside coral and seaweed |
+| **Expanded tank** | The default half-size is `14 × 8 × 11` (full size `28 × 16 × 22`), with upper, middle, lower, and reef habitats |
 | **Water surface** | Height-field water simulation triggered by mouse clicks, mouse drags, and fish near the waterline |
 | **Coral reef** | On page load or refresh, corals grow from zero count and zero scale into the default reef |
 | **Control drawer** | Collapsible right-side panel for fish, water, coral, lighting, and visual parameters |
@@ -67,7 +70,15 @@ Every fish has its own stable ID. Fish start as juveniles and grow on accumulate
 - Growth records are stored in browser `localStorage` and require no backend service. They normally autosave every 10 seconds and are also saved when the page is hidden or unloaded when possible.
 - The **Fish Growth** section in the control panel shows total fish, average progress, per-species statistics, and individual records. It provides **Export growth** and a confirmation-protected **Reset growth** action. The export is JSON for backup or inspection.
 
-The current scope is individual fish growth and persistence. Weather changes and a broader marine-biodiversity simulation are not implemented yet and can be added in a later phase.
+Growth records only store per-fish age and body scale; weather multipliers are runtime-only and do not change the save schema. Switching styles, changing counts, or resizing the tank preserves stable IDs for existing fish.
+
+### Weather and marine life
+
+The right-side project panel provides weather selection, an immediate switch action, and an automatic-cycle toggle. All four modes transition over eight seconds: clear weather is brightest and most active, cloudy weather softens the scene, rain increases surface disturbance, and storms slow fish and may flash lightning. Pausing the simulation also pauses the weather clock.
+
+The default tank includes six fish species (sardines, koi, clownfish, angelfish, blue tangs, and pufferfish) plus anemones, sea urchins, shells, and jellyfish. Fish use upper, middle, lower, and reef habitat layers; the small-tank preset lowers fish and ecology counts to keep the composition compact. Sliders honor each catalog's capacity, and enlarging the tank adds room without spawning an unlimited number of fish.
+
+This release intentionally does not simulate food chains, water quality, breeding, death, or predation. Those systems can be layered onto the existing runtime interfaces later. If performance drops, the scene reduces jellyfish, rain impacts, and decorative instances before reducing the core fish simulation.
 
 ---
 

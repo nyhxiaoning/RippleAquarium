@@ -27,6 +27,12 @@ function volume(halfSize: { x: number; y: number; z: number }) {
   return halfSize.x * 2 * halfSize.y * 2 * halfSize.z * 2;
 }
 
+function clampCatalogCount(count: number, maxCount: number): number {
+  if (!Number.isFinite(count)) return 0;
+  const safeMax = Number.isFinite(maxCount) ? Math.max(0, Math.floor(maxCount)) : Math.max(0, Math.floor(count));
+  return Math.min(safeMax, Math.max(0, Math.floor(count)));
+}
+
 // When the tank shrinks, scale each species' count with the volume change so a
 // small tank is not overcrowded. Enlarging the tank never spawns fish — density
 // falls on its own, and counts stay at whatever the user/preset set.
@@ -266,11 +272,13 @@ export function createAquariumManager(
     setFishCount(speciesId, count) {
       const entry = descriptor.fish.find((f) => f.speciesId === speciesId);
       if (!entry) return false;
+      const meta = getFishMeta(speciesId);
+      const nextCount = clampCatalogCount(count, meta?.maxCount ?? Math.max(0, Math.floor(count)));
       const previous = entry.count;
-      if (count > previous) growthRegistry.activate(speciesId, count - previous);
-      else if (count < previous) growthRegistry.deactivate(speciesId, previous - count);
-      entry.count = count;
-      handle?.setFishCount(speciesId, count);
+      if (nextCount > previous) growthRegistry.activate(speciesId, nextCount - previous);
+      else if (nextCount < previous) growthRegistry.deactivate(speciesId, previous - nextCount);
+      entry.count = nextCount;
+      handle?.setFishCount(speciesId, nextCount);
       notify();
       return true;
     },
@@ -278,7 +286,7 @@ export function createAquariumManager(
       const meta = getFishMeta(speciesId);
       if (!meta || descriptor.fish.some((f) => f.speciesId === speciesId)) return false;
       if (!handle) return false;
-      const requested = count ?? meta.defaultCount;
+      const requested = clampCatalogCount(count ?? meta.defaultCount, meta.maxCount);
       growthRegistry.activate(speciesId, requested);
       const school = handle.addFishSpecies(speciesId, requested);
       if (!school) return false;
@@ -298,15 +306,18 @@ export function createAquariumManager(
     setPlantCount(speciesId, count) {
       const entry = descriptor.plants.find((p) => p.speciesId === speciesId);
       if (!entry) return false;
-      entry.count = count;
-      handle?.setPlantCount(speciesId, count);
+      const meta = getPlantMeta(speciesId);
+      const nextCount = clampCatalogCount(count, meta?.maxCount ?? Math.max(0, Math.floor(count)));
+      entry.count = nextCount;
+      handle?.setPlantCount(speciesId, nextCount);
       notify();
       return true;
     },
     async addPlantSpecies(speciesId, count) {
       const meta = getPlantMeta(speciesId);
       if (!meta || descriptor.plants.some((p) => p.speciesId === speciesId)) return false;
-      const school = await handle?.addPlantSpecies(speciesId, count ?? meta.defaultCount);
+      const requested = clampCatalogCount(count ?? meta.defaultCount, meta.maxCount);
+      const school = await handle?.addPlantSpecies(speciesId, requested);
       if (!school) return false;
       descriptor = { ...descriptor, plants: [...descriptor.plants, { speciesId, count: school.getCount() }] };
       notify();
@@ -322,8 +333,11 @@ export function createAquariumManager(
     setEcologyCount(speciesId: EcologyKind, count: number) {
       const entry = descriptor.ecology?.find((item) => item.speciesId === speciesId);
       if (!entry) return false;
-      handle?.setEcologyCount(speciesId, count);
+      const meta = getEcologyMeta(speciesId);
+      const nextCount = clampCatalogCount(count, meta?.maxCount ?? Math.max(0, Math.floor(count)));
+      handle?.setEcologyCount(speciesId, nextCount);
       entry.count = handle?.getEcologyCount(speciesId) ?? entry.count;
+      if (!handle) entry.count = nextCount;
       notify();
       return true;
     },
@@ -331,7 +345,8 @@ export function createAquariumManager(
       const meta = getEcologyMeta(speciesId);
       const ecology = descriptor.ecology ?? [];
       if (!meta || ecology.some((entry) => entry.speciesId === speciesId) || !handle) return false;
-      const school = handle.addEcologySpecies(speciesId, count ?? meta.defaultCount);
+      const requested = clampCatalogCount(count ?? meta.defaultCount, meta.maxCount);
+      const school = handle.addEcologySpecies(speciesId, requested);
       if (!school) return false;
       descriptor = { ...descriptor, ecology: [...ecology, { speciesId, count: school.getCount() }] };
       notify();

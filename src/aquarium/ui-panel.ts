@@ -1,4 +1,6 @@
 import { FISH_CATALOG, PLANT_CATALOG, getFishMeta, getPlantMeta } from "./species-catalog.js";
+import { ECOLOGY_CATALOG, getEcologyMeta } from "../ecology/catalog.js";
+import type { EcologyKind } from "../ecology/types.js";
 import { getStyleById, listStyleIds } from "./presets.js";
 import { getLanguage, t } from "../i18n.js";
 import type { AquariumManager } from "./types.js";
@@ -69,9 +71,9 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
     sizeTitle.textContent = t("aquariumSize");
     root.appendChild(sizeTitle);
     const sizeFields = [
-      { key: "x" as const, label: t("sizeX"), min: 3, max: 30, step: 0.5 },
-      { key: "y" as const, label: t("sizeY"), min: 2, max: 20, step: 0.5 },
-      { key: "z" as const, label: t("sizeZ"), min: 3, max: 24, step: 0.5 },
+      { key: "x" as const, label: t("sizeX"), min: 3, max: 36, step: 0.5 },
+      { key: "y" as const, label: t("sizeY"), min: 2, max: 24, step: 0.5 },
+      { key: "z" as const, label: t("sizeZ"), min: 3, max: 30, step: 0.5 },
     ];
     for (const field of sizeFields) {
       const label = document.createElement("label");
@@ -122,6 +124,18 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
     }
     root.appendChild(plantList);
     root.appendChild(buildAddSelect("plant", descriptor, manager));
+
+    // Other marine life
+    const ecologyTitle = document.createElement("h3");
+    ecologyTitle.textContent = t("ecologySpecies");
+    root.appendChild(ecologyTitle);
+    const ecologyList = document.createElement("div");
+    ecologyList.className = "species-list";
+    for (const entry of descriptor.ecology ?? []) {
+      ecologyList.appendChild(renderSpeciesRow(entry, "ecology", manager));
+    }
+    root.appendChild(ecologyList);
+    root.appendChild(buildAddSelect("ecology", descriptor, manager));
 
     root.appendChild(buildGrowthSection(manager, descriptor));
   }
@@ -262,13 +276,13 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
 
   function renderSpeciesRow(
     entry: { speciesId: string; count: number },
-    kind: "fish" | "plant",
+    kind: "fish" | "plant" | "ecology",
     manager: AquariumManager,
   ) {
     const row = document.createElement("div");
     row.className = "species-row";
 
-    const catalog = kind === "fish" ? FISH_CATALOG : PLANT_CATALOG;
+    const catalog = kind === "fish" ? FISH_CATALOG : kind === "plant" ? PLANT_CATALOG : ECOLOGY_CATALOG;
     const meta = catalog.find((m) => m.id === entry.speciesId);
     const name = document.createElement("span");
     name.className = "species-name";
@@ -285,8 +299,10 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
       suppressRender = true;
       if (kind === "fish") {
         manager.setFishCount(entry.speciesId, Number(slider.value));
-      } else {
+      } else if (kind === "plant") {
         manager.setPlantCount(entry.speciesId, Number(slider.value));
+      } else {
+        manager.setEcologyCount(entry.speciesId as EcologyKind, Number(slider.value));
       }
       suppressRender = false;
     });
@@ -300,8 +316,10 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
       suppressRender = true;
       if (kind === "fish") {
         manager.removeFishSpecies(entry.speciesId);
-      } else {
+      } else if (kind === "plant") {
         manager.removePlantSpecies(entry.speciesId);
+      } else {
+        manager.removeEcologySpecies(entry.speciesId as EcologyKind);
       }
       suppressRender = false;
       render();
@@ -312,21 +330,22 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
   }
 
   function buildAddSelect(
-    kind: "fish" | "plant",
+    kind: "fish" | "plant" | "ecology",
     descriptor: ReturnType<AquariumManager["getDescriptor"]>,
     manager: AquariumManager,
   ) {
     const select = document.createElement("select");
     select.className = "add-select";
-    select.setAttribute("data-i18n-aria-label", kind === "fish" ? "addFish" : "addPlant");
+    const addLabel = kind === "fish" ? "addFish" : kind === "plant" ? "addPlant" : "addEcology";
+    select.setAttribute("data-i18n-aria-label", addLabel);
 
     const placeholder = document.createElement("option");
     placeholder.value = "";
-    placeholder.textContent = kind === "fish" ? t("addFish") : t("addPlant");
+    placeholder.textContent = t(addLabel);
     select.appendChild(placeholder);
 
-    const catalog = kind === "fish" ? FISH_CATALOG : PLANT_CATALOG;
-    const active = kind === "fish" ? descriptor.fish : descriptor.plants;
+    const catalog = kind === "fish" ? FISH_CATALOG : kind === "plant" ? PLANT_CATALOG : ECOLOGY_CATALOG;
+    const active = kind === "fish" ? descriptor.fish : kind === "plant" ? descriptor.plants : (descriptor.ecology ?? []);
     for (const meta of catalog) {
       if (active.some((entry) => entry.speciesId === meta.id)) continue;
       const opt = document.createElement("option");
@@ -337,16 +356,22 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
 
     select.addEventListener("change", () => {
       if (!select.value) return;
-      const meta = (kind === "fish" ? getFishMeta(select.value) : getPlantMeta(select.value));
+      const meta = kind === "fish"
+        ? getFishMeta(select.value)
+        : kind === "plant"
+          ? getPlantMeta(select.value)
+          : getEcologyMeta(select.value);
       suppressRender = true;
       if (kind === "fish") {
         manager.addFishSpecies(select.value, meta?.defaultCount ?? 1);
-      } else {
+      } else if (kind === "plant") {
         void manager.addPlantSpecies(select.value, meta?.defaultCount ?? 1).then(() => {
           suppressRender = false;
           render();
         });
         return;
+      } else {
+        manager.addEcologySpecies(select.value as EcologyKind, meta?.defaultCount ?? 1);
       }
       suppressRender = false;
       render();

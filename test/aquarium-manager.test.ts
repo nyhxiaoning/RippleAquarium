@@ -102,7 +102,14 @@ describe("aquarium manager (descriptor logic, no WebGL)", () => {
 
   it("starts from the default style with default counts", () => {
     assert.strictEqual(manager.getDescriptor().id, "default");
-    assert.deepStrictEqual(fishCounts(manager), { sardine: 60, koi: 24, clownfish: 18 });
+    assert.deepStrictEqual(fishCounts(manager), {
+      sardine: 60,
+      koi: 24,
+      clownfish: 18,
+      angelfish: 12,
+      "blue-tang": 10,
+      pufferfish: 6,
+    });
   });
 
   it("reports style ids and half size from the descriptor", () => {
