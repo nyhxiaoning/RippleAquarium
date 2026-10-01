@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { fishConfig, simulationSettings } from "../config.js";
 import { loadFishModel } from "../fish-renderer.js";
 import { getFishMeta, getPlantMeta } from "./species-catalog.js";
+import { getEcologyMeta } from "../ecology/catalog.js";
+import type { EcologyKind } from "../ecology/types.js";
 import { getStyleById, listStyleIds } from "./presets.js";
 import { buildAquariumScene } from "./scene-builder.js";
 import { createFishGrowthRegistry } from "../growth/registry.js";
@@ -58,6 +60,7 @@ function cloneDescriptor(descriptor: AquariumDescriptor): AquariumDescriptor {
     decor: descriptor.decor.map((item) => ({ ...item })),
     fish: descriptor.fish.map((entry) => ({ ...entry })),
     plants: descriptor.plants.map((entry) => ({ ...entry })),
+    ecology: descriptor.ecology?.map((entry) => ({ ...entry })),
   };
 }
 
@@ -293,6 +296,36 @@ export function createAquariumManager(
       notify();
       return true;
     },
+    setEcologyCount(speciesId: EcologyKind, count: number) {
+      const entry = descriptor.ecology?.find((item) => item.speciesId === speciesId);
+      if (!entry) return false;
+      handle?.setEcologyCount(speciesId, count);
+      entry.count = handle?.getEcologyCount(speciesId) ?? entry.count;
+      notify();
+      return true;
+    },
+    addEcologySpecies(speciesId: EcologyKind, count) {
+      const meta = getEcologyMeta(speciesId);
+      const ecology = descriptor.ecology ?? [];
+      if (!meta || ecology.some((entry) => entry.speciesId === speciesId) || !handle) return false;
+      const school = handle.addEcologySpecies(speciesId, count ?? meta.defaultCount);
+      if (!school) return false;
+      descriptor = { ...descriptor, ecology: [...ecology, { speciesId, count: school.getCount() }] };
+      notify();
+      return true;
+    },
+    removeEcologySpecies(speciesId: EcologyKind) {
+      if (!descriptor.ecology?.some((entry) => entry.speciesId === speciesId)) return false;
+      handle?.removeEcologySpecies(speciesId);
+      descriptor = {
+        ...descriptor,
+        ecology: descriptor.ecology?.filter((entry) => entry.speciesId !== speciesId),
+      };
+      notify();
+      return true;
+    },
+    getEcologyCount: (speciesId: EcologyKind) => handle?.getEcologyCount(speciesId) ?? 0,
+    getActiveEcology: () => handle?.getActiveEcology() ?? descriptor.ecology ?? [],
     async loadModels() {
       await loadFishModel();
       handle?.refreshFishMeshes();

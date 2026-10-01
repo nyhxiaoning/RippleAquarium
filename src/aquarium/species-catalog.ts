@@ -42,7 +42,7 @@ export const FISH_CATALOG: FishCatalogEntry[] = [
   { id: "koi", name: { zh: "锦鲤", en: "Koi" }, kind: "schooling", maxCount: 120, defaultCount: 24, modelKey: "koi", habitatLayer: "middle", defaultSpeedScale: 0.82, growthScale: 1.08 },
   { id: "clownfish", name: { zh: "小丑鱼", en: "Clownfish" }, kind: "bottom", maxCount: 40, defaultCount: 18, modelKey: "clown", habitatLayer: "reef", defaultSpeedScale: 0.45, growthScale: 0.78 },
   { id: "starfish", name: { zh: "海星", en: "Starfish" }, kind: "bottom", maxCount: 30, defaultCount: 14, modelKey: "starfish", habitatLayer: "lower", defaultSpeedScale: 0.2, growthScale: 0.9 },
-  { id: "angelfish", name: { zh: "神仙鱼", en: "Angelfish" }, kind: "schooling", maxCount: 60, defaultCount: 12, modelKey: "angelfish", habitatLayer: "middle", defaultSpeedScale: 0.82, growthScale: 1.05 },
+  { id: "angelfish", name: { zh: "天使鱼", en: "Angelfish" }, kind: "schooling", maxCount: 60, defaultCount: 12, modelKey: "angelfish", habitatLayer: "middle", defaultSpeedScale: 0.82, growthScale: 1.05 },
   { id: "blue-tang", name: { zh: "蓝吊鱼", en: "Blue Tang" }, kind: "schooling", maxCount: 50, defaultCount: 10, modelKey: "blue-tang", habitatLayer: "upper", defaultSpeedScale: 1.08, growthScale: 0.98 },
   { id: "pufferfish", name: { zh: "河豚", en: "Pufferfish" }, kind: "schooling", maxCount: 24, defaultCount: 6, modelKey: "pufferfish", habitatLayer: "lower", defaultSpeedScale: 0.52, growthScale: 1.12 },
 ];

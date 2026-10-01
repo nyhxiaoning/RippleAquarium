@@ -4,6 +4,9 @@ import { addLighting, addObstacles, createAquariumShell } from "../scene-setup.j
 import { createPineappleHouseDecor } from "../decor/pineapple-house.js";
 import { createSpongebobPatrickDecor } from "../decor/spongebob-patrick.js";
 import { createFishSchool, createPlantSchool } from "./species-catalog.js";
+import { createEcologySchool } from "../ecology/catalog.js";
+import type { EcologyEntry, EcologyKind } from "../ecology/types.js";
+import { createHabitatLayout } from "./habitat.js";
 import type {
   AquariumDescriptor,
   AquariumSceneHandle,
@@ -133,9 +136,18 @@ export async function buildAquariumScene(
     seed: 73,
     growthRegistry,
   };
+  const ecologyDeps = {
+    aquariumHalfSize: halfSize,
+    waterLevelY,
+    aquariumFloorY,
+    habitat: createHabitatLayout(descriptor.aquarium.halfSize),
+    seed: 73,
+  };
 
   const fishSchools = new Map<string, SchoolHandle>();
   const plantSchools = new Map<string, SchoolHandle>();
+  const ecologySchools = new Map<EcologyKind, SchoolHandle>();
+  const ecologyEntries: EcologyEntry[] = (descriptor.ecology ?? []).map((entry) => ({ ...entry }));
 
   // Plants first: the clownfish school needs the coral reef to avoid.
   for (const entry of descriptor.plants) {
@@ -148,6 +160,16 @@ export async function buildAquariumScene(
   }
 
   const ctx = { coralReef: plantSchools.get("coral") ?? null };
+
+  for (const entry of ecologyEntries) {
+    const school = createEcologySchool(entry.speciesId, entry.count, ecologyDeps);
+    if (school) {
+      school.group.name = `Ecology-${entry.speciesId}`;
+      root.add(school.group);
+      ecologySchools.set(entry.speciesId, school);
+      entry.count = school.getCount();
+    }
+  }
 
   function buildFishSchools(entries: AquariumDescriptor["fish"], context: typeof ctx) {
     for (const entry of entries) {
@@ -210,6 +232,9 @@ export async function buildAquariumScene(
     for (const school of plantSchools.values()) {
       school.update(time, dt);
     }
+    for (const school of ecologySchools.values()) {
+      school.update(time, dt);
+    }
     shell.update(time);
   }
 
@@ -219,6 +244,9 @@ export async function buildAquariumScene(
     aquariumFloorY = -halfSize.y;
     speciesDeps.waterLevelY = waterLevelY;
     speciesDeps.aquariumFloorY = aquariumFloorY;
+    ecologyDeps.waterLevelY = waterLevelY;
+    ecologyDeps.aquariumFloorY = aquariumFloorY;
+    ecologyDeps.habitat = createHabitatLayout({ x: halfSize.x, y: halfSize.y, z: halfSize.z });
     lighting.resize?.(halfSize);
     shell.resize(halfSize);
     for (const school of fishSchools.values()) {
@@ -226,6 +254,9 @@ export async function buildAquariumScene(
       school.rescalePositions?.(halfSize);
     }
     for (const school of plantSchools.values()) {
+      school.resize?.(halfSize);
+    }
+    for (const school of ecologySchools.values()) {
       school.resize?.(halfSize);
     }
   }
@@ -279,11 +310,42 @@ export async function buildAquariumScene(
     plantSchools.delete(speciesId);
   }
 
+  function setEcologyCount(speciesId: EcologyKind, count: number) {
+    const school = ecologySchools.get(speciesId);
+    if (!school) return;
+    school.setCount(count);
+    const entry = ecologyEntries.find((item) => item.speciesId === speciesId);
+    if (entry) entry.count = school.getCount();
+  }
+
+  function addEcology(speciesId: EcologyKind, count: number): SchoolHandle | null {
+    if (ecologySchools.has(speciesId)) return null;
+    const school = createEcologySchool(speciesId, count, ecologyDeps);
+    if (!school) return null;
+    school.group.name = `Ecology-${speciesId}`;
+    root.add(school.group);
+    ecologySchools.set(speciesId, school);
+    ecologyEntries.push({ speciesId, count: school.getCount() });
+    return school;
+  }
+
+  function removeEcology(speciesId: EcologyKind) {
+    const school = ecologySchools.get(speciesId);
+    if (!school) return;
+    school.dispose();
+    root.remove(school.group);
+    ecologySchools.delete(speciesId);
+    const index = ecologyEntries.findIndex((entry) => entry.speciesId === speciesId);
+    if (index >= 0) ecologyEntries.splice(index, 1);
+  }
+
   function dispose() {
     for (const school of fishSchools.values()) school.dispose();
     for (const school of plantSchools.values()) school.dispose();
+    for (const school of ecologySchools.values()) school.dispose();
     fishSchools.clear();
     plantSchools.clear();
+    ecologySchools.clear();
     shell.dispose();
     lighting; // lights are part of the root group, cleared with it
     root.clear();
@@ -300,6 +362,9 @@ export async function buildAquariumScene(
     setPlantCount,
     addPlantSpecies: addPlant,
     removePlantSpecies: removePlant,
+    setEcologyCount,
+    addEcologySpecies: addEcology,
+    removeEcologySpecies: removeEcology,
     getFishCount: (speciesId) => fishSchools.get(speciesId)?.getCount() ?? 0,
     getActiveFish: () => descriptor.fish.map((entry) => ({
       speciesId: entry.speciesId,
@@ -308,6 +373,11 @@ export async function buildAquariumScene(
     getActivePlants: () => descriptor.plants.map((entry) => ({
       speciesId: entry.speciesId,
       count: plantSchools.get(entry.speciesId)?.getCount() ?? entry.count,
+    })),
+    getEcologyCount: (speciesId) => ecologySchools.get(speciesId)?.getCount() ?? 0,
+    getActiveEcology: () => ecologyEntries.map((entry) => ({
+      speciesId: entry.speciesId,
+      count: ecologySchools.get(entry.speciesId)?.getCount() ?? entry.count,
     })),
     getWaterLevelY: () => waterLevelY,
     getAquariumFloorY: () => aquariumFloorY,
