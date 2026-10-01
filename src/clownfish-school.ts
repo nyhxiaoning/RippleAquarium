@@ -34,10 +34,11 @@ const tmpCorrection = new THREE.Vector3();
 
 export function createClownfishSchool(
   coralReef,
-  { count = 18, seed = 211, avoidanceZones = clownfishAvoidanceZones }: {
+  { count = 18, seed = 211, avoidanceZones = clownfishAvoidanceZones, fishIds }: {
     count?: number;
     seed?: number;
     avoidanceZones?: ExclusionZone[];
+    fishIds?: readonly string[];
   } = {},
 ) {
   const { geometry, material } = createFishModelInstanceByKey("clown");
@@ -58,8 +59,9 @@ export function createClownfishSchool(
 
   const random = mulberry32(seed);
   const fish = Array.from({ length: maxCount }, (_, index) =>
-    createClownfish(index, random, avoidanceZones),
+    createClownfish(index, random, avoidanceZones, fishIds?.[index]),
   );
+  const growthSizes = new Array<number>(maxCount).fill(1);
   function update(time, dt) {
     const step = Math.min(dt, 1 / 30);
     for (const item of fish) {
@@ -68,7 +70,7 @@ export function createClownfishSchool(
       updateClownfish(item, coralReef, step, time, avoidanceZones);
       writeFishOrientationQuaternion(item, item.velocity, tmpQuaternion);
       updateFishCurveAttributes(curveAttributes, item.index, item, tmpQuaternion);
-      tmpScale.setScalar(swimScale);
+      tmpScale.setScalar(swimScale * (Number.isFinite(growthSizes[item.index]) ? growthSizes[item.index] : 1));
       tmpMatrix.compose(item.position, tmpQuaternion, tmpScale);
       mesh.setMatrixAt(item.index, tmpMatrix);
     }
@@ -90,6 +92,13 @@ export function createClownfishSchool(
     setCount(nextCount) {
       mesh.count = normalizeCount(nextCount);
     },
+    getFishIds() {
+      return fish.slice(0, mesh.count).map((item) => item.fishId);
+    },
+    setGrowthSizes(sizes) {
+      for (let i = 0; i < mesh.count; i += 1) growthSizes[i] = sizes[i] ?? 1;
+      update(0, 0);
+    },
   };
 }
 
@@ -97,13 +106,14 @@ function normalizeCount(count) {
   return THREE.MathUtils.clamp(Math.floor(count), 0, maxCount);
 }
 
-function createClownfish(index, random, zones: ExclusionZone[] = clownfishAvoidanceZones) {
+function createClownfish(index, random, zones: ExclusionZone[] = clownfishAvoidanceZones, fishId?: string) {
   const position = createClownfishPosition(random, zones);
   const angle = random() * Math.PI * 2;
   const speed = THREE.MathUtils.lerp(0.42, 0.78, random());
 
   return {
     index,
+    fishId: fishId ?? `clownfish-${index}`,
     position,
     velocity: new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(speed),
     bank: 0,

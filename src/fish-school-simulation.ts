@@ -103,18 +103,30 @@ export class FishSchoolSimulation {
     this.forwardAxis = new THREE.Vector3(0, 0, 1);
   }
 
-  reset(count: number, seed = 42): void {
+  reset(count: number, seed = 42, fishIds?: readonly string[]): void {
     const targetCount = normalizeFishCount(count, 0);
     this.fish.length = 0;
     this.random = mulberry32(seed);
 
     for (let i = 0; i < targetCount; i += 1) {
-      this.fish.push(this.createFish(i));
+      this.fish.push(this.createFish(i, fishIds?.[i]));
     }
   }
 
-  setCount(count: number): void {
+  setCount(count: number, fishIds?: readonly string[]): void {
     const targetCount = normalizeFishCount(count, this.fish.length);
+
+    if (fishIds) {
+      const existing = new Map(this.fish.map((fish) => [fish.fishId, fish]));
+      const next: FishState[] = [];
+      for (let i = 0; i < targetCount; i += 1) {
+        const id = fishIds[i];
+        const current = id ? existing.get(id) : undefined;
+        next.push(current ?? this.createFish(i, id));
+      }
+      this.fish = next;
+      return;
+    }
 
     if (targetCount < this.fish.length) {
       this.fish.length = targetCount;
@@ -131,7 +143,7 @@ export class FishSchoolSimulation {
     this.aquariumHalfSize = halfSize;
   }
 
-  createFish(index = this.fish.length): FishState {
+  createFish(index = this.fish.length, fishId?: string): FishState {
     const position = randomPointInAquarium(this.random, this.aquariumHalfSize, 0.62);
     const direction = randomPointInSphere(this.random, 1).normalize();
     const speed = THREE.MathUtils.lerp(
@@ -141,6 +153,7 @@ export class FishSchoolSimulation {
     );
 
     return {
+      fishId: fishId ?? `sim-fish-${index}`,
       position,
       velocity: direction.multiplyScalar(speed),
       ...this.createMotionState(index),

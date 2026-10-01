@@ -73,6 +73,8 @@ export function createFishSchool(
         dispose: () => school.dispose(),
         setCount: (n) => school.setCount(n),
         getCount: () => school.mesh.count,
+        getFishIds: () => school.getFishIds(),
+        setGrowthSizes: (sizes) => school.setGrowthSizes(sizes),
       };
     }
     case "starfish":
@@ -114,12 +116,13 @@ function createBoidsSchool(
   const mesh = createFishMeshByKey(capacity, modelKey);
   setFishMeshCount(mesh, sim.fish.length);
   updateFishInstances(mesh, sim.fish);
+  let growthSizes: readonly number[] = [];
 
   return {
     group: mesh,
     update(_time, dt) {
       sim.update(dt);
-      updateFishInstances(mesh, sim.fish);
+      updateFishInstances(mesh, sim.fish, growthSizes);
     },
     dispose() {
       disposeFishMesh(mesh);
@@ -127,10 +130,17 @@ function createBoidsSchool(
     setCount(n) {
       sim.setCount(n);
       setFishMeshCount(mesh, sim.fish.length);
-      updateFishInstances(mesh, sim.fish);
+      updateFishInstances(mesh, sim.fish, growthSizes);
     },
     getCount() {
       return sim.fish.length;
+    },
+    getFishIds() {
+      return sim.fish.map((fish) => fish.fishId);
+    },
+    setGrowthSizes(sizes) {
+      growthSizes = sizes;
+      updateFishInstances(mesh, sim.fish, growthSizes);
     },
     getFish(index) {
       return sim.fish[index];
@@ -148,7 +158,7 @@ function createBoidsSchool(
         fish.position.y = THREE.MathUtils.clamp(fish.position.y, -halfSize.y + margin, halfSize.y - margin);
         fish.position.z = THREE.MathUtils.clamp(fish.position.z, -halfSize.z + margin, halfSize.z - margin);
       }
-      updateFishInstances(mesh, sim.fish);
+      updateFishInstances(mesh, sim.fish, growthSizes);
     },
   };
 }
@@ -176,6 +186,10 @@ async function createCoralSchool(count: number, deps: SpeciesCreateDeps): Promis
     getCount() {
       return reef.count;
     },
+    getFishIds() {
+      return [];
+    },
+    setGrowthSizes() {},
     setSettings({ count, scale }) {
       reef.rebuild({
         count: Number.isFinite(count) ? count : reef.count,
@@ -219,11 +233,13 @@ function createStarfishSchool(count: number, deps: SpeciesCreateDeps): SchoolHan
       velocity: new THREE.Vector3((Math.random() - 0.5) * 0.4, 0, (Math.random() - 0.5) * 0.4),
       phase: Math.random() * Math.PI * 2,
       size: THREE.MathUtils.lerp(0.5, 0.85, Math.random()),
+      fishId: `starfish-${index}`,
     };
   });
 
   const tmpMatrix = new THREE.Matrix4();
   const tmpScale = new THREE.Vector3();
+  let growthSizes: readonly number[] = [];
 
   function update(_time, dt) {
     const floorY = deps.aquariumFloorY + 0.07;
@@ -241,7 +257,8 @@ function createStarfishSchool(count: number, deps: SpeciesCreateDeps): SchoolHan
       item.position.x = THREE.MathUtils.clamp(item.position.x, -limit.x + margin, limit.x - margin);
       item.position.z = THREE.MathUtils.clamp(item.position.z, -limit.z + margin, limit.z - margin);
 
-      tmpMatrix.compose(item.position, new THREE.Quaternion(), tmpScale.setScalar(item.size));
+      const growth = growthSizes[item.index] ?? 1;
+      tmpMatrix.compose(item.position, new THREE.Quaternion(), tmpScale.setScalar(item.size * (Number.isFinite(growth) ? growth : 1)));
       mesh.setMatrixAt(item.index, tmpMatrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
@@ -261,6 +278,13 @@ function createStarfishSchool(count: number, deps: SpeciesCreateDeps): SchoolHan
     },
     getCount() {
       return mesh.count;
+    },
+    getFishIds() {
+      return items.slice(0, mesh.count).map((item) => item.fishId);
+    },
+    setGrowthSizes(sizes) {
+      growthSizes = sizes;
+      update(0, 0);
     },
   };
 }
@@ -331,6 +355,10 @@ function createSeaweedSchool(count: number, deps: SpeciesCreateDeps): SchoolHand
     getCount() {
       return mesh.count;
     },
+    getFishIds() {
+      return [];
+    },
+    setGrowthSizes() {},
   };
 }
 

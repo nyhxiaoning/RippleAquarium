@@ -59,6 +59,8 @@ export interface FishMotionState {
 }
 
 export interface FishState extends FishMotionState {
+  /** Stable identity used to bind simulation state to growth records. */
+  fishId: string;
   position: THREE.Vector3;
   velocity: THREE.Vector3;
 }

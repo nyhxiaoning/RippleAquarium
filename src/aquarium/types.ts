@@ -76,6 +76,8 @@ export interface SchoolHandle {
   dispose(): void;
   setCount(n: number): void;
   getCount(): number;
+  getFishIds(): string[];
+  setGrowthSizes(sizes: readonly number[]): void;
   resize?(halfSize: THREE.Vector3): void;
   /** Coral reef backing the clownfish school (only set for the coral plant). */
   reef?: CoralReefLike;

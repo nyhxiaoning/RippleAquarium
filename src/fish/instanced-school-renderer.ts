@@ -80,7 +80,7 @@ export function disposeFishMesh(mesh) {
   disposeFishMaterial(mesh.material);
 }
 
-export function updateFishInstances(mesh, fish) {
+export function updateFishInstances(mesh, fish, sizeMultipliers?: readonly number[]) {
   const curveAttributes = readFishCurveAttributes(mesh.geometry);
   const fishScale = fishConfig.renderScale * (mesh.userData.renderScale ?? 1);
 
@@ -95,10 +95,11 @@ export function updateFishInstances(mesh, fish) {
       tmpQuaternion,
     );
 
+    const growthScale = sizeMultipliers?.[i] ?? 1;
     tmpMatrix.compose(
       currentFish.position,
       tmpQuaternion,
-      tmpScale.copy(unitScale).multiplyScalar(fishScale),
+      tmpScale.copy(unitScale).multiplyScalar(fishScale * (Number.isFinite(growthScale) ? growthScale : 1)),
     );
     mesh.setMatrixAt(i, tmpMatrix);
   }
