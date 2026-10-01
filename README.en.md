@@ -55,6 +55,7 @@ A whole tank of fish swims on its own using boids flocking: they gather, turn, a
 | **Weather** | Clear, cloudy, rain, and storm modes cycle automatically or can be selected manually; weather affects lighting, water, fish speed, and growth |
 | **Marine biodiversity** | Anemones, sea urchins, shells, and jellyfish add layered life alongside coral and seaweed |
 | **Expanded tank** | The default half-size is `14 × 8 × 11` (full size `28 × 16 × 22`), with upper, middle, lower, and reef habitats |
+| **SpongeBob theme** | Squidward, Mr. Krabs, themed Squidward's House and Krusty Krab props, with low-amplitude idle animations and independent toggles |
 | **Water surface** | Height-field water simulation triggered by mouse clicks, mouse drags, and fish near the waterline |
 | **Coral reef** | On page load or refresh, corals grow from zero count and zero scale into the default reef |
 | **Control drawer** | Collapsible right-side panel for fish, water, coral, lighting, and visual parameters |
@@ -79,6 +80,18 @@ The right-side project panel provides weather selection, an immediate switch act
 The default tank includes six fish species (sardines, koi, clownfish, angelfish, blue tangs, and pufferfish) plus anemones, sea urchins, shells, and jellyfish. Fish use upper, middle, lower, and reef habitat layers; the small-tank preset lowers fish and ecology counts to keep the composition compact. Sliders honor each catalog's capacity, and enlarging the tank adds room without spawning an unlimited number of fish.
 
 This release intentionally does not simulate food chains, water quality, breeding, death, or predation. Those systems can be layered onto the existing runtime interfaces later. If performance drops, the scene reduces jellyfish, rain impacts, and decorative instances before reducing the core fish simulation.
+
+### SpongeBob-themed content
+
+The default tank has two themed corners at the rear: Squidward and a Squidward's House prop (styled after the Easter Island head) on the left, plus Mr. Krabs and a Krusty Krab sign/counter on the right. Characters and props are bottom-anchored and use their own collision and fish-avoidance zones; they do not join the boids schools or write to fish growth persistence.
+
+- Squidward has a gray-blue body with purple tentacle accents. His tentacles sway at different phases while the body makes a subtle side-to-side idle motion.
+- Mr. Krabs has a red body, blue clothing, and yellow eyes. His claws alternate opening and closing, with an occasional small forward body tilt.
+- Characters, houses, and Krusty Krab props are generated procedurally from Three.js primitives. No additional GLB files, textures, audio, or network dependencies are introduced; shared low-poly materials keep the scene lightweight.
+- The **SpongeBob Theme** section in the right-side panel independently toggles Squidward, Mr. Krabs, both props, and idle animation, and provides character scale controls. Theme settings are runtime scene state and remain separate from growth persistence.
+- Coral-reef and deep-sea presets reduce prop scale to leave room for ecology. The small-tank preset scales characters to about 65%–75% and can hide larger props when space is tight, preventing them from blocking the fish.
+
+The theme module exposes character anchors and an optional callback, but this release does not attach click listeners, dialogs, or tasks. Future additions can use the same scene lifecycle for click interactions, dialogue prompts, collectible attachment points, or mini-game triggers.
 
 ---
 
@@ -140,6 +153,7 @@ Open the preview URL printed in the terminal to verify the actual `dist/` output
 | Top-left GitHub icon | Open the repository |
 | Space | Switch between the orbit camera and fish camera |
 | `1` / `2` | Show or hide UI panels |
+| Theme panel | Toggle Squidward, Mr. Krabs, themed props, idle animation, and character scale |
 
 ---
 
@@ -153,6 +167,7 @@ Open the preview URL printed in the terminal to verify the actual `dist/` output
 | **Fish motion** | Fish orientation follows velocity and pose changes; koi reuse sardine behavior while keeping a thicker body shape |
 | **Ripples** | Water mesh height-field propagation with mouse-triggered and fish-triggered disturbance |
 | **Coral growth** | The initialization sequence drives each coral from small to full size |
+| **Theme content** | `src/theme/` builds Squidward, Mr. Krabs, and themed props from shared low-poly primitives; animation updates preallocated part references without per-frame arrays, colors, or Three.js objects |
 | **Tooling** | Vite provides the development server, CSS hot updates, TypeScript/GLB asset handling, and production builds; Vitest runs TypeScript tests directly |
 | **Dependencies** | Three.js is an npm runtime dependency; TypeScript, Vite, Vitest, and type declarations are development dependencies |
 | **i18n** | Lightweight frontend dictionary for Chinese/English UI text |
@@ -166,6 +181,7 @@ RippleAquarium/
 │   ├── aquarium/           # Aquarium configuration, presets, scene building, and project panel
 │   ├── fish/               # Fish model loading, pose, deformation, instanced rendering, and spatial grid
 │   ├── coral/              # Coral model assets
+│   ├── theme/              # Theme characters, props, animation, and catalog
 │   ├── fish-school-simulation.ts
 │   ├── water-surface.ts
 │   ├── coral-reef.ts
