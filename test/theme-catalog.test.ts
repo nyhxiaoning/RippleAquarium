@@ -44,7 +44,8 @@ describe("theme catalog", () => {
 
 describe("theme descriptor compatibility", () => {
   it("normalizes descriptors without theme entries", () => {
-    const manager = createAquariumManager(DEFAULT_STYLE, mockDeps);
+    const legacyDescriptor = { ...DEFAULT_STYLE, themeEntries: undefined };
+    const manager = createAquariumManager(legacyDescriptor, mockDeps);
     assert.deepStrictEqual(manager.getThemeEntries(), []);
     assert.strictEqual(manager.setThemeEnabled("squidward", false), false);
     assert.strictEqual(manager.setThemeScale("mr-krabs", 0.75), false);

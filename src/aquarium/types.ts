@@ -165,6 +165,12 @@ export interface AquariumSceneHandle {
   setCoralGrowth(count: number, scale: number, growth: number[] | null): void;
   getCoralMaxCount(): number;
   refreshFishMeshes(): void;
+  /** Toggle one themed character/prop without rebuilding the aquarium. */
+  setThemeEnabled(id: string, enabled: boolean): boolean;
+  /** Enable or disable low-amplitude idle animation for themed characters. */
+  setThemeAnimationEnabled(enabled: boolean): void;
+  /** Resize a themed object in place while preserving its placement. */
+  setThemeScale(id: string, scale: number): boolean;
   setWeatherEffects(effects: WeatherEffects, state?: WeatherState): void;
   getWeatherState(): WeatherState;
 }

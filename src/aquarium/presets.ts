@@ -4,9 +4,67 @@ import {
   spongebobPatrickDecor,
 } from "../config.js";
 import type { AquariumStyle, Vec3 } from "./types.js";
+import { createThemeEntry } from "../theme/catalog.js";
+import type { ThemeEntry, ThemeObjectId } from "../theme/types.js";
 
 function vec3(v: Vec3): Vec3 {
   return { x: v.x, y: v.y, z: v.z };
+}
+
+type ThemePresetId = "default" | "coral-reef" | "deep-sea" | "small-tank";
+
+interface ThemePlacement {
+  id: ThemeObjectId;
+  position: Vec3;
+  rotationY?: number;
+  scale?: number;
+  enabled?: boolean;
+}
+
+/**
+ * Build independent theme data for a preset.  Theme entries intentionally
+ * remain plain serializable values so switching styles cannot mutate the
+ * catalog or another style's placement.
+ */
+export function createThemeEntriesForPreset(preset: ThemePresetId): ThemeEntry[] {
+  const placements: Record<ThemePresetId, ThemePlacement[]> = {
+    default: [
+      { id: "squidward", position: { x: -7.9, y: 0, z: 5.1 }, rotationY: 0.16 },
+      { id: "mr-krabs", position: { x: 7.8, y: 0, z: 5.0 }, rotationY: -0.16 },
+      { id: "squidward-house", position: { x: -7.8, y: 0, z: 5.6 }, rotationY: 0.12 },
+      { id: "krusty-krab", position: { x: 7.6, y: 0, z: 5.55 }, rotationY: -0.12 },
+    ],
+    "coral-reef": [
+      { id: "squidward", position: { x: -10.8, y: 0, z: 6.8 }, rotationY: 0.16, scale: 0.92 },
+      { id: "mr-krabs", position: { x: 10.7, y: 0, z: 6.75 }, rotationY: -0.16, scale: 0.92 },
+      { id: "squidward-house", position: { x: -10.65, y: 0, z: 7.45 }, rotationY: 0.12, scale: 0.82 },
+      { id: "krusty-krab", position: { x: 10.45, y: 0, z: 7.35 }, rotationY: -0.12, scale: 0.82 },
+    ],
+    "deep-sea": [
+      { id: "squidward", position: { x: -6.8, y: 0, z: 4.05 }, rotationY: 0.16, scale: 0.9 },
+      { id: "mr-krabs", position: { x: 6.7, y: 0, z: 4.0 }, rotationY: -0.16, scale: 0.9 },
+      { id: "squidward-house", position: { x: -6.65, y: 0, z: 4.65 }, rotationY: 0.12, scale: 0.8 },
+      { id: "krusty-krab", position: { x: 6.45, y: 0, z: 4.6 }, rotationY: -0.12, scale: 0.8 },
+    ],
+    "small-tank": [
+      // Characters stay visible at 70% scale, while their larger props are
+      // disabled to preserve a clear swim lane in the compact tank.
+      { id: "squidward", position: { x: -2.35, y: 0, z: 1.8 }, rotationY: 0.16, scale: 0.7 },
+      { id: "mr-krabs", position: { x: 2.35, y: 0, z: 1.8 }, rotationY: -0.16, scale: 0.7 },
+      { id: "squidward-house", position: { x: -2.25, y: 0, z: 2.2 }, rotationY: 0.12, scale: 0.68, enabled: false },
+      { id: "krusty-krab", position: { x: 2.2, y: 0, z: 2.2 }, rotationY: -0.12, scale: 0.68, enabled: false },
+    ],
+  };
+
+  return placements[preset].map((placement) => {
+    const entry = createThemeEntry(placement.id, {
+      enabled: placement.enabled,
+      scale: placement.scale,
+    });
+    entry.position = { ...placement.position };
+    entry.rotationY = placement.rotationY ?? entry.rotationY;
+    return entry;
+  });
 }
 
 /** The default style is generated from the existing config constants so the
@@ -37,6 +95,7 @@ export const DEFAULT_STYLE: AquariumStyle = {
       height: spongebobPatrickDecor.height,
     },
   ],
+  themeEntries: createThemeEntriesForPreset("default"),
   fish: [
     { speciesId: "sardine", count: 60 },
     { speciesId: "koi", count: 24 },
@@ -80,6 +139,7 @@ export const CORAL_REEF_STYLE: AquariumStyle = {
       height: 2.35,
     },
   ],
+  themeEntries: createThemeEntriesForPreset("coral-reef"),
   fish: [
     { speciesId: "sardine", count: 80 },
     { speciesId: "koi", count: 30 },
@@ -121,6 +181,7 @@ export const DEEP_SEA_STYLE: AquariumStyle = {
       height: 6.08,
     },
   ],
+  themeEntries: createThemeEntriesForPreset("deep-sea"),
   fish: [
     { speciesId: "sardine", count: 40 },
     { speciesId: "koi", count: 10 },
@@ -158,6 +219,7 @@ export const SMALL_TANK_STYLE: AquariumStyle = {
       height: 4.2,
     },
   ],
+  themeEntries: createThemeEntriesForPreset("small-tank"),
   fish: [
     { speciesId: "sardine", count: 18 },
     { speciesId: "koi", count: 6 },

@@ -14,6 +14,9 @@ import type {
   SpeciesCreateDeps,
 } from "./types.js";
 import type { ThemeEntry } from "../theme/types.js";
+import type { ThemeObjectHandle, ThemeCharacterId, ThemePropId } from "../theme/types.js";
+import { createThemeCharacter } from "../theme/characters.js";
+import { createThemeProp } from "../theme/props.js";
 import {
   getThemeAvoidanceZone,
   getThemePropCollision,
@@ -218,6 +221,8 @@ export async function buildAquariumScene(
   const fishSchools = new Map<string, SchoolHandle>();
   const plantSchools = new Map<string, SchoolHandle>();
   const ecologySchools = new Map<EcologyKind, SchoolHandle>();
+  const themeHandles = new Map<string, ThemeObjectHandle>();
+  let themeAnimationEnabled = true;
   const ecologyEntries: EcologyEntry[] = (descriptor.ecology ?? []).map((entry) => ({ ...entry }));
   let weatherEffects: WeatherEffects = getWeatherEffects("clear");
   let weatherState: WeatherState = Object.freeze({
@@ -323,6 +328,42 @@ export async function buildAquariumScene(
     }
   }
 
+  function positionThemeObject(handle: ThemeObjectHandle, entry: ThemeEntry) {
+    handle.group.position.set(entry.position.x, entry.position.y, entry.position.z);
+    handle.group.rotation.y = entry.rotationY;
+    handle.resize(halfSize);
+  }
+
+  function createThemeHandle(entry: ThemeEntry): ThemeObjectHandle | null {
+    if (themeHandles.has(entry.id)) return themeHandles.get(entry.id) ?? null;
+    try {
+      const handle = entry.kind === "character"
+        ? createThemeCharacter(entry.id as ThemeCharacterId, {
+            scale: entry.scale,
+            animationEnabled: themeAnimationEnabled,
+          })
+        : createThemeProp(entry.id as ThemePropId, { scale: entry.scale });
+      if (!handle) return null;
+      positionThemeObject(handle, entry);
+      handle.group.visible = entry.enabled;
+      root.add(handle.group);
+      themeHandles.set(entry.id, handle);
+      return handle;
+    } catch (error) {
+      // A malformed optional theme object must not prevent the aquarium from
+      // loading.  The prop/character factories already provide their own
+      // graceful fallbacks; this catches unexpected constructor failures.
+      console.warn(`Theme object ${entry.id} could not be created.`, error);
+      return null;
+    }
+  }
+
+  // Build themed objects after regular decor so they remain a separate,
+  // keyed lifecycle and can be toggled without rebuilding fish schools.
+  for (const entry of descriptor.themeEntries ?? []) {
+    if (entry.enabled) createThemeHandle(entry);
+  }
+
   scene.add(root);
 
   function update(time: number, dt: number) {
@@ -347,6 +388,9 @@ export async function buildAquariumScene(
     }
     for (const school of ecologySchools.values()) {
       school.update(time, dt);
+    }
+    for (const handle of themeHandles.values()) {
+      handle.update(time, dt);
     }
     shell.update(time);
   }
@@ -377,6 +421,9 @@ export async function buildAquariumScene(
     }
     for (const school of ecologySchools.values()) {
       school.resize?.(halfSize);
+    }
+    for (const handle of themeHandles.values()) {
+      handle.resize(halfSize);
     }
     refreshClownfishHabitatAnchors();
   }
@@ -470,13 +517,44 @@ export async function buildAquariumScene(
     school?.setHabitatAnchors?.(collectAnemoneAnchors(ecologySchools.get("anemone")));
   }
 
+  function setThemeEnabled(id: string, enabled: boolean): boolean {
+    const entry = descriptor.themeEntries?.find((item) => item.id === id);
+    if (!entry) return false;
+    entry.enabled = Boolean(enabled);
+    const handle = enabled ? createThemeHandle(entry) : themeHandles.get(id);
+    if (handle) handle.group.visible = Boolean(enabled);
+    return true;
+  }
+
+  function setThemeAnimationEnabled(enabled: boolean) {
+    themeAnimationEnabled = Boolean(enabled);
+    for (const handle of themeHandles.values()) {
+      const animated = handle as ThemeObjectHandle & { setAnimationEnabled?: (value: boolean) => void };
+      animated.setAnimationEnabled?.(themeAnimationEnabled);
+    }
+  }
+
+  function setThemeScale(id: string, scale: number): boolean {
+    const entry = descriptor.themeEntries?.find((item) => item.id === id);
+    if (!entry || !Number.isFinite(scale)) return false;
+    entry.scale = Math.max(0, scale);
+    const handle = themeHandles.get(id) ?? (entry.enabled ? createThemeHandle(entry) : null);
+    if (handle) {
+      handle.group.scale.setScalar(Math.max(0.01, entry.scale));
+      handle.resize(halfSize);
+    }
+    return true;
+  }
+
   function dispose() {
     for (const school of fishSchools.values()) school.dispose();
     for (const school of plantSchools.values()) school.dispose();
     for (const school of ecologySchools.values()) school.dispose();
+    for (const handle of themeHandles.values()) handle.dispose();
     fishSchools.clear();
     plantSchools.clear();
     ecologySchools.clear();
+    themeHandles.clear();
     baseBoidsSettings.clear();
     shell.dispose();
     lighting; // lights are part of the root group, cleared with it
@@ -541,6 +619,9 @@ export async function buildAquariumScene(
       return plantSchools.get("coral")?.getMaxCount?.() ?? 0;
     },
     refreshFishMeshes,
+    setThemeEnabled,
+    setThemeAnimationEnabled,
+    setThemeScale,
     setWeatherEffects(effects, state) {
       weatherEffects = effects;
       if (state) weatherState = Object.freeze({ ...state });
