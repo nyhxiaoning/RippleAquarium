@@ -9,6 +9,8 @@ describe("weather effects", () => {
       fishSpeedMultiplier: 1,
       growthRateMultiplier: 1,
       rippleMultiplier: 1,
+      rainIntensity: 0,
+      snowIntensity: 0,
     });
     expect(getWeatherEffects("cloudy")).toMatchObject({
       lightingMultiplier: 0.75,
@@ -21,40 +23,42 @@ describe("weather effects", () => {
       fishSpeedMultiplier: 0.82,
       growthRateMultiplier: 0.95,
       rippleMultiplier: 1.6,
+      snowIntensity: 0,
     });
-    expect(getWeatherEffects("storm")).toMatchObject({
-      lightingMultiplier: 0.45,
-      fishSpeedMultiplier: 0.65,
-      growthRateMultiplier: 0.85,
-      rippleMultiplier: 2.2,
+    expect(getWeatherEffects("snow")).toMatchObject({
+      lightingMultiplier: 0.68,
+      fishSpeedMultiplier: 0.86,
+      growthRateMultiplier: 0.92,
+      rippleMultiplier: 1.15,
+      rainIntensity: 0,
+      snowIntensity: 0.55,
     });
   });
 
-  it("starts clear with a full transition and the clear duration", () => {
+  it("starts clear with a full transition and no expiry timer", () => {
     const controller = createWeatherController();
     expect(controller.getState()).toEqual({
       kind: "clear",
       progress: 1,
-      remainingSeconds: 90,
-      autoCycle: true,
+      remainingSeconds: 0,
     });
     expect(controller.getEffects()).toEqual(getWeatherEffects("clear"));
   });
 
-  it("smoothly transitions after a manual weather switch and resets its timer", () => {
+  it("smoothly transitions after a manual weather switch", () => {
     const controller = createWeatherController();
     controller.setWeather("rain");
 
     expect(controller.getState()).toMatchObject({
       kind: "rain",
       progress: 0,
-      remainingSeconds: 45,
+      remainingSeconds: 0,
     });
     expect(controller.getEffects().lightingMultiplier).toBeCloseTo(1);
 
     controller.update(4);
     expect(controller.getState().progress).toBeCloseTo(0.5);
-    expect(controller.getState().remainingSeconds).toBe(41);
+    expect(controller.getState().remainingSeconds).toBe(0);
     expect(controller.getEffects().lightingMultiplier).toBeCloseTo(0.8);
 
     controller.update(4);
@@ -62,26 +66,12 @@ describe("weather effects", () => {
     expect(controller.getEffects().lightingMultiplier).toBeCloseTo(0.6);
   });
 
-  it("cycles in the fixed order with weather-specific durations", () => {
+  it("keeps the selected weather after a long update", () => {
     const controller = createWeatherController();
-    controller.update(90);
-    expect(controller.getState()).toMatchObject({ kind: "cloudy", remainingSeconds: 60, progress: 0 });
-    controller.update(60);
-    expect(controller.getState()).toMatchObject({ kind: "rain", remainingSeconds: 45, progress: 0 });
-    controller.update(45);
-    expect(controller.getState()).toMatchObject({ kind: "storm", remainingSeconds: 30, progress: 0 });
-    controller.update(30);
-    expect(controller.getState()).toMatchObject({ kind: "clear", remainingSeconds: 90, progress: 0 });
-  });
-
-  it("can pause automatic cycling without changing the selected weather", () => {
-    const controller = createWeatherController();
-    controller.setAutoCycle(false);
+    controller.setWeather("snow");
     controller.update(120);
-    expect(controller.getState()).toMatchObject({ kind: "clear", remainingSeconds: 0, autoCycle: false });
-    controller.setWeather("storm");
-    controller.update(3);
-    expect(controller.getState()).toMatchObject({ kind: "storm", remainingSeconds: 27, autoCycle: false });
+    expect(controller.getState()).toEqual({ kind: "snow", progress: 1, remainingSeconds: 0 });
+    expect(controller.getEffects().snowIntensity).toBe(0.55);
   });
 
   it("does not advance when dt is zero", () => {

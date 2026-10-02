@@ -176,24 +176,40 @@ canvas {
   font-size: 12px;
 }
 
-.weather-controls {
+.weather-buttons {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
   margin-top: 8px;
 }
 
-.weather-controls .add-select {
-  margin-top: 0;
-}
-
-.weather-auto-label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 8px;
+.weather-button {
+  min-height: 32px;
+  padding: 0 6px;
+  border: 1px solid rgb(226 239 255 / 18%);
+  border-radius: 7px;
   color: #b9c9d7;
+  background: rgb(20 39 48 / 72%);
   font-size: 12px;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.weather-button:hover,
+.weather-button.is-active,
+.weather-button[aria-pressed="true"] {
+  border-color: #61d394;
+  color: #eef2f7;
+  background: #315a63;
+}
+
+@media (max-width: 340px) {
+  .weather-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .theme-section {

@@ -233,6 +233,5 @@ export interface AquariumManager {
   getGrowthRecords(speciesId?: string, includeInactive?: boolean): import("../growth/types.js").FishGrowthRecord[];
   getWeatherState(): WeatherState;
   setWeather(kind: WeatherKind): void;
-  setWeatherAutoCycle(enabled: boolean): void;
   getWeatherEffects(): WeatherEffects;
 }

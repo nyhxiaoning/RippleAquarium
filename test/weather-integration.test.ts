@@ -14,8 +14,7 @@ describe("weather integration", () => {
     assert.deepStrictEqual(manager.getWeatherState(), {
       kind: "clear",
       progress: 1,
-      remainingSeconds: 90,
-      autoCycle: true,
+      remainingSeconds: 0,
     });
 
     manager.setWeather("rain");
@@ -31,9 +30,9 @@ describe("weather integration", () => {
     const record = manager.getGrowthRecords("sardine")[0];
     assert.ok(record);
 
-    manager.setWeather("storm");
+    manager.setWeather("snow");
     manager.update(1, 4);
-    assert.strictEqual(manager.getGrowthRecords("sardine")[0].accumulatedAgeSeconds, 3.7);
+    assert.strictEqual(manager.getGrowthRecords("sardine")[0].accumulatedAgeSeconds, 3.84);
 
     const beforePause = manager.getGrowthRecords("sardine")[0].accumulatedAgeSeconds;
     const beforeState = manager.getWeatherState();
@@ -42,14 +41,13 @@ describe("weather integration", () => {
     assert.deepStrictEqual(manager.getWeatherState(), beforeState);
   });
 
-  it("can disable the automatic cycle without changing the selected mode", () => {
+  it("keeps a manually selected mode after a long update", () => {
     const manager = createAquariumManager(DEFAULT_STYLE, mockDeps);
-    manager.setWeatherAutoCycle(false);
-    manager.setWeather("cloudy");
+    manager.setWeather("snow");
     manager.update(1, 120);
     const state = manager.getWeatherState();
-    assert.strictEqual(state.kind, "cloudy");
-    assert.strictEqual(state.autoCycle, false);
-    assert.strictEqual(state.remainingSeconds, 52);
+    assert.strictEqual(state.kind, "snow");
+    assert.strictEqual(state.progress, 1);
+    assert.strictEqual(state.remainingSeconds, 0);
   });
 });

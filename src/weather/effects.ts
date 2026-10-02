@@ -8,6 +8,7 @@ const EFFECTS: Readonly<Record<WeatherKind, WeatherEffects>> = Object.freeze({
     rippleMultiplier: 1,
     backgroundColor: 0x081016,
     rainIntensity: 0,
+    snowIntensity: 0,
     lightningChance: 0,
   }),
   cloudy: Object.freeze({
@@ -17,6 +18,7 @@ const EFFECTS: Readonly<Record<WeatherKind, WeatherEffects>> = Object.freeze({
     rippleMultiplier: 1.1,
     backgroundColor: 0x0a141c,
     rainIntensity: 0,
+    snowIntensity: 0,
     lightningChance: 0,
   }),
   rain: Object.freeze({
@@ -26,16 +28,18 @@ const EFFECTS: Readonly<Record<WeatherKind, WeatherEffects>> = Object.freeze({
     rippleMultiplier: 1.6,
     backgroundColor: 0x071018,
     rainIntensity: 0.35,
+    snowIntensity: 0,
     lightningChance: 0.08,
   }),
-  storm: Object.freeze({
-    lightingMultiplier: 0.45,
-    fishSpeedMultiplier: 0.65,
-    growthRateMultiplier: 0.85,
-    rippleMultiplier: 2.2,
-    backgroundColor: 0x03070b,
-    rainIntensity: 0.85,
-    lightningChance: 0.25,
+  snow: Object.freeze({
+    lightingMultiplier: 0.68,
+    fishSpeedMultiplier: 0.86,
+    growthRateMultiplier: 0.92,
+    rippleMultiplier: 1.15,
+    backgroundColor: 0x091722,
+    rainIntensity: 0,
+    snowIntensity: 0.55,
+    lightningChance: 0,
   }),
 });
 
@@ -43,4 +47,3 @@ const EFFECTS: Readonly<Record<WeatherKind, WeatherEffects>> = Object.freeze({
 export function getWeatherEffects(kind: WeatherKind): WeatherEffects {
   return EFFECTS[kind];
 }
-

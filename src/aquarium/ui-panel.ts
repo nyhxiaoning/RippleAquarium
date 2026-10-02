@@ -14,7 +14,6 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
   container.insertBefore(root, container.firstChild);
 
   let suppressRender = false;
-  let weatherTimer: ReturnType<typeof setInterval> | null = null;
 
   manager.on("change", () => {
     if (suppressRender) return;
@@ -151,56 +150,27 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
 
     const status = document.createElement("p");
     status.className = "weather-status";
-    const updateStatus = () => {
-      const state = manager.getWeatherState();
-      status.textContent = `${t(`weather_${state.kind}`)} · ${Math.ceil(state.remainingSeconds)}s`;
-    };
-    updateStatus();
+    const state = manager.getWeatherState();
+    status.textContent = t(`weather_${state.kind}`);
     section.appendChild(status);
 
     const controls = document.createElement("div");
-    controls.className = "weather-controls";
-    const select = document.createElement("select");
-    select.className = "add-select";
-    select.setAttribute("aria-label", t("weatherSelect"));
-    const current = manager.getWeatherState().kind;
+    controls.className = "weather-buttons";
+    const current = state.kind;
     for (const kind of WEATHER_KINDS) {
-      const option = document.createElement("option");
-      option.value = kind;
-      option.textContent = t(`weather_${kind}`);
-      option.selected = kind === current;
-      select.appendChild(option);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "weather-button" + (kind === current ? " is-active" : "");
+      button.dataset.weatherKind = kind;
+      button.setAttribute("aria-pressed", String(kind === current));
+      button.textContent = t(`weather_${kind}`);
+      button.addEventListener("click", () => {
+        manager.setWeather(kind as WeatherKind);
+        render();
+      });
+      controls.appendChild(button);
     }
-    controls.appendChild(select);
-
-    const switchButton = document.createElement("button");
-    switchButton.type = "button";
-    switchButton.textContent = t("weatherSwitch");
-    switchButton.addEventListener("click", () => {
-      manager.setWeather(select.value as WeatherKind);
-      render();
-    });
-    controls.appendChild(switchButton);
     section.appendChild(controls);
-
-    const autoLabel = document.createElement("label");
-    autoLabel.className = "weather-auto-label";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = manager.getWeatherState().autoCycle;
-    checkbox.addEventListener("change", () => {
-      manager.setWeatherAutoCycle(checkbox.checked);
-      updateStatus();
-    });
-    autoLabel.appendChild(checkbox);
-    autoLabel.appendChild(document.createTextNode(t("weatherAutoCycle")));
-    section.appendChild(autoLabel);
-
-    if (weatherTimer === null) {
-      weatherTimer = setInterval(() => {
-        if (root.isConnected) updateStatus();
-      }, 1000);
-    }
     return section;
   }
 
@@ -460,8 +430,6 @@ export function createProjectPanel(manager: AquariumManager, container: HTMLElem
 
   return {
     dispose() {
-      if (weatherTimer !== null) clearInterval(weatherTimer);
-      weatherTimer = null;
       document.removeEventListener("languagechange", handleLanguageChange);
       root.remove();
     },

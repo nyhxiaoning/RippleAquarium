@@ -250,11 +250,6 @@ export function createAquariumManager(
       handle?.setWeatherEffects(weather.getEffects(), weather.getState());
       notify();
     },
-    setWeatherAutoCycle(enabled: boolean) {
-      weather.setAutoCycle(enabled);
-      handle?.setWeatherEffects(weather.getEffects(), weather.getState());
-      notify();
-    },
     update(time, dt) {
       const previous = weather.getState();
       const state = weather.update(dt);
@@ -264,7 +259,7 @@ export function createAquariumManager(
       } else if (dt > 0) {
         growthRegistry.advanceOnline(dt * weather.getEffects().growthRateMultiplier);
       }
-      if (state.kind !== previous.kind || state.autoCycle !== previous.autoCycle) notify();
+      if (state.kind !== previous.kind) notify();
       if (dt > 0) markGrowthDirty();
     },
     on(event, cb) {
