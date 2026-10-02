@@ -25,6 +25,7 @@ import {
 import type { ExclusionZone, Obstacle } from "../types.js";
 import { getWeatherEffects } from "../weather/effects.js";
 import type { WeatherEffects, WeatherState } from "../weather/types.js";
+import { createWeatherPrecipitation } from "../weather/precipitation.js";
 
 const PINEAPPLE_OBSTACLE_SIZE = new THREE.Vector3(4.35, 5.1, 4.05);
 const PINEAPPLE_FOOTPRINT_RADIUS = 3.53;
@@ -189,6 +190,7 @@ export async function buildAquariumScene(
   scene.background = new THREE.Color(descriptor.theme.backgroundColor);
 
   const shell = createAquariumShell(root, renderer, halfSize);
+  const precipitation = createWeatherPrecipitation(root, halfSize);
   const obstacles = computeObstacles(descriptor.decor, halfSize, descriptor.themeEntries);
   addObstacles(root, obstacles);
 
@@ -392,6 +394,7 @@ export async function buildAquariumScene(
     for (const handle of themeHandles.values()) {
       handle.update(time, dt);
     }
+    precipitation.update(time);
     shell.update(time);
   }
 
@@ -425,6 +428,7 @@ export async function buildAquariumScene(
     for (const handle of themeHandles.values()) {
       handle.resize(halfSize);
     }
+    precipitation.resize(halfSize);
     refreshClownfishHabitatAnchors();
   }
 
@@ -556,6 +560,7 @@ export async function buildAquariumScene(
     ecologySchools.clear();
     themeHandles.clear();
     baseBoidsSettings.clear();
+    precipitation.dispose();
     shell.dispose();
     lighting; // lights are part of the root group, cleared with it
     root.clear();
@@ -637,6 +642,7 @@ export async function buildAquariumScene(
       weatherEffects = effects;
       if (state) weatherState = Object.freeze({ ...state });
       lighting.setWeatherMultiplier?.(effects.lightingMultiplier);
+      precipitation.setWeatherEffects(effects);
       shell.waterSurface.setWeatherEffects?.(effects);
       applyWeatherBoidsSettings();
       if (scene.background instanceof THREE.Color) {
