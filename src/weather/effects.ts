@@ -29,7 +29,7 @@ const EFFECTS: Readonly<Record<WeatherKind, WeatherEffects>> = Object.freeze({
     backgroundColor: 0x071018,
     rainIntensity: 0.35,
     snowIntensity: 0,
-    lightningChance: 0.08,
+    lightningChance: 0,
   }),
   snow: Object.freeze({
     lightingMultiplier: 0.68,

@@ -230,8 +230,7 @@ export async function buildAquariumScene(
   let weatherState: WeatherState = Object.freeze({
     kind: "clear",
     progress: 1,
-    remainingSeconds: 90,
-    autoCycle: true,
+    remainingSeconds: 0,
   });
   let lastLightningCheck = -Infinity;
   let lightningFlashUntil = -Infinity;
@@ -372,7 +371,7 @@ export async function buildAquariumScene(
     if (dt > 0) growthRegistry.advanceOnline(dt * weatherEffects.growthRateMultiplier);
     if (weatherEffects.lightningChance > 0 && time >= lastLightningCheck + 1.5) {
       lastLightningCheck = time;
-      // A deterministic, throttled check keeps storm flashes rare without
+      // A deterministic, throttled check keeps rain flashes rare without
       // allocating random state or making a frame-dependent visual effect.
       const roll = (Math.sin(time * 12.9898 + 78.233) * 43758.5453) % 1;
       if (Math.abs(roll) < weatherEffects.lightningChance) {
