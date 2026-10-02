@@ -12,6 +12,10 @@ describe("procedural fish species", () => {
       const model = createProceduralFishModel(key);
       expect(model.geometry.getAttribute("position").count).toBeGreaterThan(0);
       expect(model.geometry.getAttribute("normal").count).toBeGreaterThan(0);
+      expect(model.geometry.getAttribute("position").count).toBeGreaterThan(120);
+      expect(model.geometry.getAttribute("color").count).toBe(
+        model.geometry.getAttribute("position").count,
+      );
       expect(model.material).toBeDefined();
       expect(model.renderScale).toBeGreaterThan(0);
       expect(() => {
