@@ -44,6 +44,7 @@ const localForward = new THREE.Vector3(0, 1, 0);
 const tmpAxis = new THREE.Vector3();
 const tmpQuaternion = new THREE.Quaternion();
 const tmpVertex = new THREE.Vector3();
+const tmpColor = new THREE.Color();
 
 /** Create a fresh, disposable geometry/material pair for one procedural species. */
 export function createProceduralFishModel(key: ProceduralFishKey): FishModelInstance {
@@ -184,7 +185,10 @@ function createCaudalFin(options: {
     bevelThickness: bevel,
     curveSegments: 4,
   });
-  geometry.translate(0, options.y, -thickness * 0.5);
+  // The shape is authored in an x/z profile. Extrude along local z, then
+  // rotate it so the fin's thickness follows the swim axis (+Y).
+  geometry.rotateX(Math.PI / 2);
+  geometry.translate(0, options.y + thickness * 0.5, 0);
   paint(geometry, () => options.color);
   return geometry;
 }
@@ -231,20 +235,73 @@ function createMembraneFin(options: {
 
 function createSardine(): FishModelInstance {
   const parts: THREE.BufferGeometry[] = [];
-  const body = new THREE.SphereGeometry(1, 32, 18);
-  body.scale(0.42, 1.08, 0.23);
-  body.translate(0, 0.08, 0);
-  paint(body, (position) => {
-    if (position.z < -0.11) return SARDINE_BELLY;
-    if (position.z > 0.1 && position.y < 0.45) return SARDINE_STRIPE;
-    return SARDINE_BODY;
+  const body = createNaturalBody({
+    scale: new THREE.Vector3(0.42, 1.08, 0.23),
+    center: new THREE.Vector3(0, 0.08, 0),
+    radialSegments: 32,
+    verticalSegments: 20,
+    taper: 0.2,
+    headFullness: 0.14,
+    colorAt: (position, normalizedY) => {
+      if (position.z < -0.08) return SARDINE_BELLY;
+      if (position.z > 0.095 && normalizedY < 0.78) return SARDINE_STRIPE;
+      return SARDINE_BODY;
+    },
   });
   parts.push(body);
-  parts.push(forkedTail(0.62, 0.72, 0.12, -0.94, SARDINE_FIN));
-  parts.push(finTriangle(0.46, 0.4, 0.14, 0.08, 0.2, SARDINE_FIN, "dorsal"));
-  parts.push(finTriangle(0.38, 0.3, 0.12, -0.34, -0.2, SARDINE_FIN, "ventral"));
-  parts.push(finTriangle(0.42, 0.34, 0.14, 0.3, 0.2, SARDINE_FIN, "pectoral-left"));
-  parts.push(finTriangle(0.42, 0.34, 0.14, 0.3, -0.2, SARDINE_FIN, "pectoral-right"));
+  parts.push(createTailPeduncle({
+    y: -0.98,
+    length: 0.3,
+    bodyRadius: 0.14,
+    tailRadius: 0.07,
+    color: SARDINE_FIN,
+  }));
+  parts.push(createCaudalFin({
+    y: -1.15,
+    width: 0.64,
+    height: 0.54,
+    thickness: 0.06,
+    color: SARDINE_FIN,
+    fork: 0.32,
+  }));
+  parts.push(createMembraneFin({
+    baseY: 0.24,
+    baseZ: 0.18,
+    span: 0.48,
+    height: 0.18,
+    thickness: 0.04,
+    color: SARDINE_FIN,
+    orientation: "dorsal",
+  }));
+  parts.push(createMembraneFin({
+    baseY: -0.34,
+    baseZ: -0.18,
+    span: 0.38,
+    height: 0.12,
+    thickness: 0.04,
+    color: SARDINE_FIN,
+    orientation: "ventral",
+  }));
+  parts.push(createMembraneFin({
+    baseY: 0.36,
+    baseZ: 0.02,
+    span: 0.3,
+    height: 0.11,
+    thickness: 0.035,
+    color: SARDINE_FIN,
+    orientation: "pectoral",
+  }));
+  const sardinePectoral = createMembraneFin({
+    baseY: 0.36,
+    baseZ: 0.02,
+    span: 0.3,
+    height: 0.11,
+    thickness: 0.035,
+    color: SARDINE_FIN,
+    orientation: "pectoral",
+  });
+  sardinePectoral.scale(-1, 1, 1);
+  parts.push(sardinePectoral);
   parts.push(eye(0.23, 0.86, 0.12, 0.28));
   parts.push(eye(-0.23, 0.86, 0.12, 0.28));
   parts.push(mouth(0.06, 1.12, 0.01));
@@ -253,22 +310,80 @@ function createSardine(): FishModelInstance {
 
 function createKoi(): FishModelInstance {
   const parts: THREE.BufferGeometry[] = [];
-  const body = new THREE.SphereGeometry(1, 32, 20);
-  body.scale(0.58, 1.08, 0.34);
-  body.translate(0, 0.02, 0);
-  paint(body, (position) => {
-    const headPatch = position.y > 0.58 && position.z > -0.2;
-    const midPatch = position.y > -0.12 && position.y < 0.32 && Math.abs(position.x) < 0.45;
-    const rearPatch = position.y < -0.42 && position.x > -0.22;
-    if (headPatch || midPatch || rearPatch) return KOI_ORANGE;
-    return position.z < -0.15 ? KOI_BELLY : KOI_BODY;
+  const body = createNaturalBody({
+    scale: new THREE.Vector3(0.58, 1.08, 0.34),
+    center: new THREE.Vector3(0, 0.02, 0),
+    radialSegments: 32,
+    verticalSegments: 20,
+    taper: 0.14,
+    headFullness: 0.22,
+    colorAt: (position) => {
+      const bellyWeight = 1 - THREE.MathUtils.smoothstep(position.z, -0.22, -0.04);
+      const headDistance = Math.hypot((position.y - 0.62) / 0.42, position.x / 0.5);
+      const midDistance = Math.hypot((position.y - 0.06) / 0.42, position.x / 0.56);
+      const rearDistance = Math.hypot((position.y + 0.54) / 0.36, (position.x - 0.08) / 0.42);
+      const headPatch = 1 - THREE.MathUtils.smoothstep(headDistance, 0.38, 0.86);
+      const midPatch = 1 - THREE.MathUtils.smoothstep(midDistance, 0.42, 0.9);
+      const rearPatch = 1 - THREE.MathUtils.smoothstep(rearDistance, 0.38, 0.88);
+      const orangeWeight = Math.max(headPatch, midPatch, rearPatch);
+      tmpColor.copy(KOI_BODY).lerp(KOI_BELLY, bellyWeight);
+      return tmpColor.lerp(KOI_ORANGE, orangeWeight);
+    },
   });
   parts.push(body);
-  parts.push(forkedTail(0.82, 0.78, 0.16, -1.0, KOI_FIN));
-  parts.push(finTriangle(0.7, 0.55, 0.18, 0.18, 0.3, KOI_FIN, "dorsal"));
-  parts.push(finTriangle(0.58, 0.38, 0.16, -0.32, -0.28, KOI_FIN, "ventral"));
-  parts.push(finTriangle(0.56, 0.44, 0.18, 0.32, 0.3, KOI_FIN, "pectoral-left"));
-  parts.push(finTriangle(0.56, 0.44, 0.18, 0.32, -0.3, KOI_FIN, "pectoral-right"));
+  parts.push(createTailPeduncle({
+    y: -1.0,
+    length: 0.34,
+    bodyRadius: 0.22,
+    tailRadius: 0.1,
+    color: KOI_FIN,
+  }));
+  parts.push(createCaudalFin({
+    y: -1.2,
+    width: 0.9,
+    height: 0.68,
+    thickness: 0.08,
+    color: KOI_FIN,
+    fork: 0.28,
+  }));
+  parts.push(createMembraneFin({
+    baseY: 0.22,
+    baseZ: 0.29,
+    span: 0.62,
+    height: 0.22,
+    thickness: 0.05,
+    color: KOI_FIN,
+    orientation: "dorsal",
+  }));
+  parts.push(createMembraneFin({
+    baseY: -0.34,
+    baseZ: -0.28,
+    span: 0.48,
+    height: 0.15,
+    thickness: 0.045,
+    color: KOI_FIN,
+    orientation: "ventral",
+  }));
+  parts.push(createMembraneFin({
+    baseY: 0.42,
+    baseZ: 0.02,
+    span: 0.4,
+    height: 0.15,
+    thickness: 0.04,
+    color: KOI_FIN,
+    orientation: "pectoral",
+  }));
+  const koiPectoral = createMembraneFin({
+    baseY: 0.42,
+    baseZ: 0.02,
+    span: 0.4,
+    height: 0.15,
+    thickness: 0.04,
+    color: KOI_FIN,
+    orientation: "pectoral",
+  });
+  koiPectoral.scale(-1, 1, 1);
+  parts.push(koiPectoral);
   parts.push(eye(0.34, 0.88, 0.2, 0.3));
   parts.push(eye(-0.34, 0.88, 0.2, 0.3));
   parts.push(mouth(0.08, 1.12, 0.01));
@@ -277,24 +392,80 @@ function createKoi(): FishModelInstance {
 
 function createClownfish(): FishModelInstance {
   const parts: THREE.BufferGeometry[] = [];
-  const body = new THREE.SphereGeometry(1, 32, 20);
-  body.scale(0.48, 0.88, 0.3);
-  body.translate(0, 0.06, 0);
-  paint(body, (position) => {
-    const bands = [0.45, 0.02, -0.4];
-    for (const center of bands) {
-      const distance = Math.abs(position.y - center);
-      if (distance < 0.095) return CLOWNFISH_WHITE;
-      if (distance < 0.14) return CLOWNFISH_BLACK;
-    }
-    return position.z < -0.14 ? CLOWNFISH_BELLY : CLOWNFISH_BODY;
+  const body = createNaturalBody({
+    scale: new THREE.Vector3(0.48, 0.88, 0.3),
+    center: new THREE.Vector3(0, 0.06, 0),
+    radialSegments: 32,
+    verticalSegments: 20,
+    taper: 0.16,
+    headFullness: 0.18,
+    colorAt: (position) => {
+      tmpColor.copy(position.z < -0.14 ? CLOWNFISH_BELLY : CLOWNFISH_BODY);
+      let whiteWeight = 0;
+      let blackWeight = 0;
+      for (const center of [0.45, 0.02, -0.4]) {
+        const distance = Math.abs(position.y - center);
+        whiteWeight = Math.max(whiteWeight, 1 - THREE.MathUtils.smoothstep(distance, 0.055, 0.11));
+        blackWeight = Math.max(blackWeight, 1 - THREE.MathUtils.smoothstep(distance, 0.1, 0.16));
+      }
+      tmpColor.lerp(CLOWNFISH_BLACK, blackWeight);
+      return tmpColor.lerp(CLOWNFISH_WHITE, whiteWeight);
+    },
   });
   parts.push(body);
-  parts.push(forkedTail(0.68, 0.68, 0.14, -0.88, CLOWNFISH_FIN));
-  parts.push(finTriangle(0.56, 0.54, 0.16, 0.12, 0.28, CLOWNFISH_BLACK, "dorsal"));
-  parts.push(finTriangle(0.48, 0.36, 0.14, -0.3, -0.26, CLOWNFISH_BLACK, "ventral"));
-  parts.push(finTriangle(0.46, 0.4, 0.16, 0.28, 0.3, CLOWNFISH_FIN, "pectoral-left"));
-  parts.push(finTriangle(0.46, 0.4, 0.16, 0.28, -0.3, CLOWNFISH_FIN, "pectoral-right"));
+  parts.push(createTailPeduncle({
+    y: -0.82,
+    length: 0.28,
+    bodyRadius: 0.15,
+    tailRadius: 0.075,
+    color: CLOWNFISH_FIN,
+  }));
+  parts.push(createCaudalFin({
+    y: -1.0,
+    width: 0.68,
+    height: 0.56,
+    thickness: 0.06,
+    color: CLOWNFISH_FIN,
+    fork: 0.3,
+  }));
+  parts.push(createMembraneFin({
+    baseY: 0.22,
+    baseZ: 0.25,
+    span: 0.52,
+    height: 0.2,
+    thickness: 0.045,
+    color: CLOWNFISH_BLACK,
+    orientation: "dorsal",
+  }));
+  parts.push(createMembraneFin({
+    baseY: -0.3,
+    baseZ: -0.24,
+    span: 0.4,
+    height: 0.14,
+    thickness: 0.04,
+    color: CLOWNFISH_BLACK,
+    orientation: "ventral",
+  }));
+  parts.push(createMembraneFin({
+    baseY: 0.34,
+    baseZ: 0.02,
+    span: 0.36,
+    height: 0.14,
+    thickness: 0.04,
+    color: CLOWNFISH_FIN,
+    orientation: "pectoral",
+  }));
+  const clownfishPectoral = createMembraneFin({
+    baseY: 0.34,
+    baseZ: 0.02,
+    span: 0.36,
+    height: 0.14,
+    thickness: 0.04,
+    color: CLOWNFISH_FIN,
+    orientation: "pectoral",
+  });
+  clownfishPectoral.scale(-1, 1, 1);
+  parts.push(clownfishPectoral);
   parts.push(eye(0.28, 0.7, 0.2, 0.3));
   parts.push(eye(-0.28, 0.7, 0.2, 0.3));
   parts.push(mouth(0.08, 0.96, 0.02));

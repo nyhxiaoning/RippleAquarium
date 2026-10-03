@@ -65,6 +65,23 @@ describe("procedural fish species", () => {
     angelfish.material.dispose();
   });
 
+  it("keeps natural proportions and dense vertex colors for the first fish group", () => {
+    const sardine = createProceduralFishModel("sardine");
+    const koi = createProceduralFishModel("koi");
+    const clownfish = createProceduralFishModel("clownfish");
+    const sardineSize = sardine.geometry.boundingBox!.getSize(new THREE.Vector3());
+    const koiSize = koi.geometry.boundingBox!.getSize(new THREE.Vector3());
+    const clownfishSize = clownfish.geometry.boundingBox!.getSize(new THREE.Vector3());
+
+    expect(koiSize.x).toBeGreaterThan(sardineSize.x);
+    expect(clownfishSize.y).toBeLessThan(sardineSize.y);
+    for (const model of [sardine, koi, clownfish]) {
+      expect(model.geometry.getAttribute("color").count).toBeGreaterThan(300);
+      model.geometry.dispose();
+      model.material.dispose();
+    }
+  });
+
   it("registers new fish with their intended counts and habitat metadata", () => {
     expect(FISH_CATALOG.map((entry) => entry.id)).toEqual([
       "sardine",
