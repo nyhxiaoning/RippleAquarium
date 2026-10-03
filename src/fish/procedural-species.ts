@@ -475,30 +475,42 @@ function createClownfish(): FishModelInstance {
 function createStarfish(): FishModelInstance {
   const parts: THREE.BufferGeometry[] = [];
   const shape = new THREE.Shape();
-  const outerRadius = 0.9;
-  const innerRadius = 0.38;
-  for (let index = 0; index < 10; index += 1) {
-    const angle = Math.PI / 2 + index * (Math.PI / 5);
-    const radius = index % 2 === 0 ? outerRadius : innerRadius;
-    const point = new THREE.Vector2(Math.cos(angle) * radius, Math.sin(angle) * radius);
-    if (index === 0) shape.moveTo(point.x, point.y);
-    else shape.lineTo(point.x, point.y);
+  const armCount = 5;
+  const samplesPerArm = 8;
+  const armLength = 0.82;
+  const rootRadius = 0.34;
+  const profile: THREE.Vector2[] = [];
+  for (let arm = 0; arm < armCount; arm += 1) {
+    const centerAngle = Math.PI / 2 + (arm * Math.PI * 2) / armCount;
+    for (let sample = 0; sample < samplesPerArm; sample += 1) {
+      const t = sample / samplesPerArm;
+      const localAngle = THREE.MathUtils.lerp(-Math.PI / 5, Math.PI / 5, t);
+      const armWeight = Math.pow(Math.cos(localAngle * 2.5), 0.7);
+      const radius = rootRadius + armLength * Math.max(0, armWeight);
+      const angle = centerAngle + localAngle;
+      profile.push(new THREE.Vector2(Math.cos(angle) * radius, Math.sin(angle) * radius));
+    }
   }
+  shape.moveTo(profile[0].x, profile[0].y);
+  shape.splineThru([...profile.slice(1), profile[0]]);
   shape.closePath();
   const body = new THREE.ExtrudeGeometry(shape, {
-    depth: 0.22,
+    depth: 0.16,
     bevelEnabled: true,
-    bevelSegments: 2,
-    bevelSize: 0.06,
-    bevelThickness: 0.04,
-    curveSegments: 4,
+    bevelSegments: 3,
+    bevelSize: 0.045,
+    bevelThickness: 0.035,
+    curveSegments: 6,
   });
-  body.translate(0, 0, -0.11);
-  paint(body, (position) => (position.z > 0.06 ? STARFISH_HIGHLIGHT : STARFISH_BODY));
+  body.translate(0, 0, -0.08);
+  paint(body, (position) => {
+    const radial = Math.min(1, Math.hypot(position.x, position.y) / 1.12);
+    return tmpColor.copy(STARFISH_HIGHLIGHT).lerp(STARFISH_BODY, radial);
+  });
   parts.push(body);
-  const center = new THREE.SphereGeometry(0.24, 16, 10);
-  center.scale(1, 1, 0.34);
-  center.translate(0, 0, 0.12);
+  const center = new THREE.SphereGeometry(0.27, 20, 12);
+  center.scale(1, 1, 0.28);
+  center.translate(0, 0, 0.1);
   paint(center, () => STARFISH_HIGHLIGHT);
   parts.push(center);
   return finish(parts);
@@ -506,19 +518,32 @@ function createStarfish(): FishModelInstance {
 
 function createAngelfish(): FishModelInstance {
   const parts: THREE.BufferGeometry[] = [];
-  const body = new THREE.SphereGeometry(1, 32, 20);
-  body.scale(0.74, 1.08, 0.46);
-  body.translate(0, 0.16, 0);
-  paint(body, (position) => {
-    const stripe = [0.62, 0.15, -0.31, -0.7].some((center) => Math.abs(position.y - center) < 0.1);
-    return stripe ? ANGEL_STRIPE : position.z < -0.08 ? ANGEL_BELLY : ANGEL_BODY;
+  const body = createNaturalBody({
+    scale: new THREE.Vector3(0.56, 1.06, 0.44),
+    center: new THREE.Vector3(0, 0.12, 0),
+    radialSegments: 32,
+    verticalSegments: 20,
+    taper: 0.12,
+    headFullness: 0.2,
+    colorAt: (position) => {
+      const stripeWeight = [0.62, 0.15, -0.31, -0.7].reduce(
+        (weight, center) =>
+          Math.max(weight, 1 - THREE.MathUtils.smoothstep(Math.abs(position.y - center), 0.065, 0.14)),
+        0,
+      );
+      tmpColor.copy(position.z < -0.08 ? ANGEL_BELLY : ANGEL_BODY);
+      return tmpColor.lerp(ANGEL_STRIPE, stripeWeight);
+    },
   });
   parts.push(body);
-  parts.push(tailFan(0.62, 0.7, ANGEL_BODY, -1.06));
-  parts.push(finTriangle(0.92, 1.18, 0.28, 0.28, 0.43, ANGEL_FIN, "dorsal"));
-  parts.push(finTriangle(0.84, 1.02, 0.26, -0.31, -0.39, ANGEL_FIN, "ventral"));
-  parts.push(finTriangle(0.58, 0.72, 0.2, 0.28, 0.34, ANGEL_FIN, "pectoral-left"));
-  parts.push(finTriangle(0.58, 0.72, 0.2, 0.28, -0.34, ANGEL_FIN, "pectoral-right"));
+  parts.push(createTailPeduncle({ y: -0.96, length: 0.3, bodyRadius: 0.17, tailRadius: 0.08, color: ANGEL_BODY }));
+  parts.push(createCaudalFin({ y: -1.14, width: 0.74, height: 0.58, thickness: 0.06, color: ANGEL_BODY, fork: 0.26 }));
+  parts.push(createMembraneFin({ baseY: 0.22, baseZ: 0.36, span: 1.38, height: 0.78, thickness: 0.045, color: ANGEL_FIN, orientation: "dorsal" }));
+  parts.push(createMembraneFin({ baseY: -0.2, baseZ: -0.34, span: 1.22, height: 0.68, thickness: 0.045, color: ANGEL_FIN, orientation: "ventral" }));
+  parts.push(createMembraneFin({ baseY: 0.46, baseZ: 0.24, span: 0.48, height: 0.18, thickness: 0.04, color: ANGEL_FIN, orientation: "pectoral" }));
+  const angelfishPectoral = createMembraneFin({ baseY: 0.46, baseZ: 0.24, span: 0.48, height: 0.18, thickness: 0.04, color: ANGEL_FIN, orientation: "pectoral" });
+  angelfishPectoral.scale(-1, 1, 1);
+  parts.push(angelfishPectoral);
   parts.push(eye(0.36, 0.77, 0.17, 0.36));
   parts.push(eye(-0.36, 0.77, 0.17, 0.36));
   parts.push(mouth(0.1, 0.98, 0.02));
@@ -527,20 +552,33 @@ function createAngelfish(): FishModelInstance {
 
 function createBlueTang(): FishModelInstance {
   const parts: THREE.BufferGeometry[] = [];
-  const body = new THREE.SphereGeometry(1, 32, 20);
-  body.scale(0.8, 0.98, 0.47);
-  body.translate(0, 0.08, 0);
-  paint(body, (position) => {
-    if (position.y < -0.68) return TANG_YELLOW;
-    if (Math.abs(position.x) > 0.42 && position.y > -0.1) return TANG_DARK;
-    return position.z < -0.16 ? TANG_BELLY : TANG_BODY;
+  const body = createNaturalBody({
+    scale: new THREE.Vector3(0.76, 0.98, 0.32),
+    center: new THREE.Vector3(0, 0.08, 0),
+    radialSegments: 32,
+    verticalSegments: 20,
+    taper: 0.12,
+    headFullness: 0.16,
+    colorAt: (position) => {
+      const yellowWeight = THREE.MathUtils.smoothstep(-position.y, 0.55, 0.9);
+      const darkWeight = Math.max(
+        1 - THREE.MathUtils.smoothstep(Math.abs(position.x), 0.42, 0.66),
+        1 - THREE.MathUtils.smoothstep(position.y, -0.05, 0.42),
+      );
+      tmpColor.copy(position.z < -0.12 ? TANG_BELLY : TANG_BODY);
+      tmpColor.lerp(TANG_DARK, darkWeight * 0.78);
+      return tmpColor.lerp(TANG_YELLOW, yellowWeight);
+    },
   });
   parts.push(body);
-  parts.push(tailFan(0.64, 0.64, TANG_YELLOW, -1.0));
-  parts.push(finTriangle(0.72, 0.82, 0.18, 0.2, 0.43, TANG_DARK, "dorsal"));
-  parts.push(finTriangle(0.64, 0.75, 0.18, 0.17, -0.4, TANG_DARK, "ventral"));
-  parts.push(finTriangle(0.64, 0.74, 0.2, 0.28, 0.38, TANG_DARK, "pectoral-left"));
-  parts.push(finTriangle(0.64, 0.74, 0.2, 0.28, -0.38, TANG_DARK, "pectoral-right"));
+  parts.push(createTailPeduncle({ y: -0.94, length: 0.3, bodyRadius: 0.18, tailRadius: 0.08, color: TANG_YELLOW }));
+  parts.push(createCaudalFin({ y: -1.12, width: 0.78, height: 0.58, thickness: 0.065, color: TANG_YELLOW, fork: 0.3 }));
+  parts.push(createMembraneFin({ baseY: 0.2, baseZ: 0.27, span: 0.76, height: 0.2, thickness: 0.04, color: TANG_DARK, orientation: "dorsal" }));
+  parts.push(createMembraneFin({ baseY: -0.22, baseZ: -0.25, span: 0.68, height: 0.18, thickness: 0.04, color: TANG_DARK, orientation: "ventral" }));
+  parts.push(createMembraneFin({ baseY: 0.44, baseZ: 0.1, span: 0.42, height: 0.2, thickness: 0.04, color: TANG_DARK, orientation: "pectoral" }));
+  const tangPectoral = createMembraneFin({ baseY: 0.44, baseZ: 0.1, span: 0.42, height: 0.2, thickness: 0.04, color: TANG_DARK, orientation: "pectoral" });
+  tangPectoral.scale(-1, 1, 1);
+  parts.push(tangPectoral);
   parts.push(eye(0.4, 0.72, 0.17, 0.4));
   parts.push(eye(-0.4, 0.72, 0.17, 0.4));
   parts.push(mouth(0.12, 0.96, 0.02));
@@ -549,103 +587,40 @@ function createBlueTang(): FishModelInstance {
 
 function createPufferfish(): FishModelInstance {
   const parts: THREE.BufferGeometry[] = [];
-  const body = new THREE.SphereGeometry(1, 30, 22);
-  body.scale(0.84, 0.82, 0.78);
-  body.translate(0, 0.02, 0);
-  paint(body, (position) => position.z < -0.14 ? PUFFER_BELLY : PUFFER_BODY);
+  const body = createNaturalBody({
+    scale: new THREE.Vector3(0.84, 0.82, 0.78),
+    center: new THREE.Vector3(0, 0.02, 0),
+    radialSegments: 36,
+    verticalSegments: 24,
+    taper: 0.05,
+    headFullness: 0.08,
+    colorAt: (position) => (position.z < -0.14 ? PUFFER_BELLY : PUFFER_BODY),
+  });
   parts.push(body);
-  parts.push(finTriangle(0.44, 0.48, 0.2, 0.18, 0.72, PUFFER_FIN, "dorsal"));
-  parts.push(finTriangle(0.44, 0.48, 0.2, 0.14, -0.72, PUFFER_FIN, "ventral"));
-  parts.push(finTriangle(0.46, 0.52, 0.22, 0.6, 0.1, PUFFER_FIN, "pectoral-left"));
-  parts.push(finTriangle(0.46, 0.52, 0.22, 0.6, -0.1, PUFFER_FIN, "pectoral-right"));
+  parts.push(createMembraneFin({ baseY: 0.28, baseZ: 0.7, span: 0.42, height: 0.18, thickness: 0.04, color: PUFFER_FIN, orientation: "dorsal" }));
+  parts.push(createMembraneFin({ baseY: -0.24, baseZ: -0.7, span: 0.42, height: 0.16, thickness: 0.04, color: PUFFER_FIN, orientation: "ventral" }));
+  parts.push(createMembraneFin({ baseY: 0.36, baseZ: 0.16, span: 0.36, height: 0.18, thickness: 0.04, color: PUFFER_FIN, orientation: "pectoral" }));
+  const pufferPectoral = createMembraneFin({ baseY: 0.36, baseZ: 0.16, span: 0.36, height: 0.18, thickness: 0.04, color: PUFFER_FIN, orientation: "pectoral" });
+  pufferPectoral.scale(-1, 1, 1);
+  parts.push(pufferPectoral);
   parts.push(eye(0.46, 0.46, 0.2, 0.48));
   parts.push(eye(-0.46, 0.46, 0.2, 0.48));
   parts.push(mouth(0.12, 0.72, 0.02));
 
   const spineDirections = [
-    [0.8, 0.25, 0.45], [-0.8, 0.25, 0.45], [0.78, 0.16, -0.48], [-0.78, 0.16, -0.48],
-    [0.42, 0.54, 0.55], [-0.42, 0.54, 0.55], [0.38, -0.56, 0.54], [-0.38, -0.56, 0.54],
-    [0.46, 0.38, -0.58], [-0.46, 0.38, -0.58],
+    [0.76, 0.25, 0.46], [-0.76, 0.25, 0.46], [0.72, 0.18, -0.5], [-0.72, 0.18, -0.5],
+    [0.42, 0.52, 0.56], [-0.42, 0.52, 0.56], [0.38, -0.54, 0.56], [-0.38, -0.54, 0.56],
   ];
   for (const [x, y, z] of spineDirections) {
     tmpAxis.set(x, y, z).normalize();
-    const spine = new THREE.ConeGeometry(0.07, 0.28, 5);
+    const spine = new THREE.ConeGeometry(0.045, 0.16, 5);
     tmpQuaternion.setFromUnitVectors(localForward, tmpAxis);
     spine.applyQuaternion(tmpQuaternion);
-    spine.translate(tmpAxis.x * 0.68, tmpAxis.y * 0.68, tmpAxis.z * 0.68);
+    spine.translate(tmpAxis.x * 0.75, tmpAxis.y * 0.75, tmpAxis.z * 0.75);
     paint(spine, () => PUFFER_FIN);
     parts.push(spine);
   }
   return finish(parts);
-}
-
-function tailFan(width: number, height: number, color: THREE.Color, y: number): THREE.BufferGeometry {
-  const geometry = new THREE.ConeGeometry(width, height, 8);
-  geometry.rotateZ(Math.PI);
-  geometry.translate(0, y, 0);
-  paint(geometry, () => color);
-  return geometry;
-}
-
-/** A thin, beveled, forked caudal fin with the aquarium's +Y swim direction. */
-function forkedTail(
-  width: number,
-  height: number,
-  thickness: number,
-  y: number,
-  color: THREE.Color,
-): THREE.BufferGeometry {
-  const shape = new THREE.Shape();
-  shape.moveTo(-width * 0.5, 0);
-  shape.lineTo(width * 0.5, 0);
-  shape.lineTo(width * 0.42, -height * 0.72);
-  shape.lineTo(width * 0.16, -height * 0.56);
-  shape.lineTo(0, -height * 0.36);
-  shape.lineTo(-width * 0.16, -height * 0.56);
-  shape.lineTo(-width * 0.42, -height * 0.72);
-  shape.closePath();
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: thickness,
-    bevelEnabled: true,
-    bevelSegments: 1,
-    bevelSize: 0.016,
-    bevelThickness: 0.01,
-  });
-  geometry.translate(0, y, -thickness * 0.5);
-  paint(geometry, () => color);
-  return geometry;
-}
-
-function finTriangle(
-  span: number,
-  height: number,
-  thickness: number,
-  y: number,
-  z: number,
-  color: THREE.Color,
-  placement: string,
-): THREE.BufferGeometry {
-  const shape = new THREE.Shape();
-  shape.moveTo(-span * 0.5, 0);
-  shape.lineTo(span * 0.5, 0.04);
-  shape.lineTo(span * 0.12, height);
-  shape.lineTo(-span * 0.18, height * 0.72);
-  shape.closePath();
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: thickness,
-    bevelEnabled: true,
-    bevelSegments: 1,
-    bevelSize: 0.018,
-    bevelThickness: 0.012,
-  });
-  geometry.translate(0, y, z);
-  if (placement === "dorsal" || placement === "ventral") {
-    geometry.rotateX(Math.PI / 2);
-  } else {
-    geometry.rotateY(Math.PI / 2);
-  }
-  paint(geometry, () => color);
-  return geometry;
 }
 
 function eye(x: number, y: number, z: number, radius: number): THREE.BufferGeometry {

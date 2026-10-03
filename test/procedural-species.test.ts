@@ -82,6 +82,23 @@ describe("procedural fish species", () => {
     }
   });
 
+  it("keeps intended silhouettes for the remaining natural species", () => {
+    const angelfish = createProceduralFishModel("angelfish");
+    const pufferfish = createProceduralFishModel("pufferfish");
+    const starfish = createProceduralFishModel("starfish");
+    const angelfishSize = angelfish.geometry.boundingBox!.getSize(new THREE.Vector3());
+    const pufferSize = pufferfish.geometry.boundingBox!.getSize(new THREE.Vector3());
+    const starSize = starfish.geometry.boundingBox!.getSize(new THREE.Vector3());
+
+    expect(angelfishSize.z).toBeGreaterThan(angelfishSize.x * 1.2);
+    expect(pufferSize.x).toBeGreaterThan(pufferSize.y * 0.7);
+    expect(Math.abs(starSize.x - starSize.y)).toBeLessThan(0.15);
+    for (const model of [angelfish, pufferfish, starfish]) {
+      model.geometry.dispose();
+      model.material.dispose();
+    }
+  });
+
   it("registers new fish with their intended counts and habitat metadata", () => {
     expect(FISH_CATALOG.map((entry) => entry.id)).toEqual([
       "sardine",
