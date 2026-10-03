@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest";
 import { createAquariumManager } from "../src/aquarium/manager.js";
-import { DEFAULT_STYLE } from "../src/aquarium/presets.js";
+import { CORAL_REEF_STYLE, DEFAULT_STYLE } from "../src/aquarium/presets.js";
 
 const mockDeps = {
   renderer: {} as never,
@@ -14,6 +14,16 @@ describe("aquarium manager growth integration", () => {
     const registry = manager.getGrowthRegistry();
     assert.strictEqual(registry.getStats().activeCount, 130);
     assert.strictEqual(registry.getStats("sardine").activeCount, 60);
+    for (const speciesId of [
+      "sardine",
+      "koi",
+      "clownfish",
+      "angelfish",
+      "blue-tang",
+      "pufferfish",
+    ]) {
+      assert.ok(registry.getStats(speciesId).activeCount > 0, speciesId);
+    }
   });
 
   it("deactivates youngest fish and reuses their IDs when restoring count", () => {
@@ -36,5 +46,24 @@ describe("aquarium manager growth integration", () => {
     assert.strictEqual(registry.getRecord(id)!.accumulatedAgeSeconds, 30);
     manager.dispose();
     assert.ok(manager.getGrowthRegistry().getRecord(id));
+  });
+
+  it("keeps growth sizes available for every procedural species", () => {
+    const manager = createAquariumManager(CORAL_REEF_STYLE, mockDeps);
+    const registry = manager.getGrowthRegistry();
+    registry.advanceOnline(45);
+    for (const speciesId of [
+      "sardine",
+      "koi",
+      "clownfish",
+      "starfish",
+      "angelfish",
+      "blue-tang",
+      "pufferfish",
+    ]) {
+      const record = registry.getRecords(speciesId)[0];
+      assert.ok(record);
+      assert.ok(record.sizeMultiplier > 0, speciesId);
+    }
   });
 });

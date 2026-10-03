@@ -79,7 +79,7 @@ The right-side project panel provides four manual weather buttons: sunny, rainy,
 
 The default tank includes six fish species (sardines, koi, clownfish, angelfish, blue tangs, and pufferfish) plus anemones, sea urchins, shells, and jellyfish. Fish use upper, middle, lower, and reef habitat layers; the small-tank preset lowers fish and ecology counts to keep the composition compact. Sliders honor each catalog's capacity, and enlarging the tank adds room without spawning an unlimited number of fish.
 
-Angelfish, blue tangs, and pufferfish use procedural Three.js meshes: smooth ellipsoid bodies, separate fins and tails, species-specific color regions, eyes, and a small set of pufferfish spines. They require no new external model files and continue to use instanced rendering and growth scaling.
+Sardines, koi, clownfish, starfish, angelfish, blue tangs, and pufferfish all use procedural Three.js meshes: smooth bodies, separate fins and tails, species-specific color regions, eyes, and a small set of pufferfish spines. They require no new external model files and continue to use instanced rendering and growth scaling.
 
 This release intentionally does not simulate food chains, water quality, breeding, death, or predation. Those systems can be layered onto the existing runtime interfaces later. If performance drops, the scene reduces jellyfish, rain impacts, and decorative instances before reducing the core fish simulation.
 
