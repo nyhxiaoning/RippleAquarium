@@ -6,7 +6,15 @@ import {
 } from "../src/aquarium/species-catalog.js";
 
 describe("procedural fish species", () => {
-  it.each(["angelfish", "blue-tang", "pufferfish"] as const)(
+  it.each([
+    "sardine",
+    "koi",
+    "clownfish",
+    "starfish",
+    "angelfish",
+    "blue-tang",
+    "pufferfish",
+  ] as const)(
     "creates a renderable %s model",
     (key) => {
       const model = createProceduralFishModel(key);

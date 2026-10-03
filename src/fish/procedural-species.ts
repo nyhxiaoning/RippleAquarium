@@ -3,8 +3,30 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { FishModelInstance } from "../types.js";
 
 /** Keys for fish that are built entirely from Three.js geometry. */
-export type ProceduralFishKey = "angelfish" | "blue-tang" | "pufferfish";
+export type ProceduralFishKey =
+  | "sardine"
+  | "koi"
+  | "clownfish"
+  | "starfish"
+  | "angelfish"
+  | "blue-tang"
+  | "pufferfish";
 
+const SARDINE_BODY = new THREE.Color(0x879eaf);
+const SARDINE_BELLY = new THREE.Color(0xdce7e9);
+const SARDINE_STRIPE = new THREE.Color(0x36556b);
+const SARDINE_FIN = new THREE.Color(0x6d8693);
+const KOI_BODY = new THREE.Color(0xfff3d6);
+const KOI_BELLY = new THREE.Color(0xe9d9bd);
+const KOI_ORANGE = new THREE.Color(0xd45d35);
+const KOI_FIN = new THREE.Color(0xe7aa6f);
+const CLOWNFISH_BODY = new THREE.Color(0xf47a27);
+const CLOWNFISH_WHITE = new THREE.Color(0xfff7dc);
+const CLOWNFISH_BLACK = new THREE.Color(0x171b20);
+const CLOWNFISH_FIN = new THREE.Color(0xc44f20);
+const CLOWNFISH_BELLY = new THREE.Color(0xdc6028);
+const STARFISH_BODY = new THREE.Color(0xd9684d);
+const STARFISH_HIGHLIGHT = new THREE.Color(0xf28a62);
 const ANGEL_BODY = new THREE.Color(0xd7e4e2);
 const ANGEL_BELLY = new THREE.Color(0xf4d78d);
 const ANGEL_STRIPE = new THREE.Color(0x27364a);
@@ -26,6 +48,14 @@ const tmpVertex = new THREE.Vector3();
 /** Create a fresh, disposable geometry/material pair for one procedural species. */
 export function createProceduralFishModel(key: ProceduralFishKey): FishModelInstance {
   switch (key) {
+    case "sardine":
+      return createSardine();
+    case "koi":
+      return createKoi();
+    case "clownfish":
+      return createClownfish();
+    case "starfish":
+      return createStarfish();
     case "angelfish":
       return createAngelfish();
     case "blue-tang":
@@ -38,7 +68,119 @@ export function createProceduralFishModel(key: ProceduralFishKey): FishModelInst
 }
 
 export function isProceduralFishKey(key: string): key is ProceduralFishKey {
-  return key === "angelfish" || key === "blue-tang" || key === "pufferfish";
+  return (
+    key === "sardine" ||
+    key === "koi" ||
+    key === "clownfish" ||
+    key === "starfish" ||
+    key === "angelfish" ||
+    key === "blue-tang" ||
+    key === "pufferfish"
+  );
+}
+
+function createSardine(): FishModelInstance {
+  const parts: THREE.BufferGeometry[] = [];
+  const body = new THREE.SphereGeometry(1, 32, 18);
+  body.scale(0.42, 1.08, 0.23);
+  body.translate(0, 0.08, 0);
+  paint(body, (position) => {
+    if (position.z < -0.11) return SARDINE_BELLY;
+    if (position.z > 0.1 && position.y < 0.45) return SARDINE_STRIPE;
+    return SARDINE_BODY;
+  });
+  parts.push(body);
+  parts.push(forkedTail(0.62, 0.72, 0.12, -0.94, SARDINE_FIN));
+  parts.push(finTriangle(0.46, 0.4, 0.14, 0.08, 0.2, SARDINE_FIN, "dorsal"));
+  parts.push(finTriangle(0.38, 0.3, 0.12, -0.34, -0.2, SARDINE_FIN, "ventral"));
+  parts.push(finTriangle(0.42, 0.34, 0.14, 0.3, 0.2, SARDINE_FIN, "pectoral-left"));
+  parts.push(finTriangle(0.42, 0.34, 0.14, 0.3, -0.2, SARDINE_FIN, "pectoral-right"));
+  parts.push(eye(0.23, 0.86, 0.12, 0.28));
+  parts.push(eye(-0.23, 0.86, 0.12, 0.28));
+  parts.push(mouth(0.06, 1.12, 0.01));
+  return finish(parts);
+}
+
+function createKoi(): FishModelInstance {
+  const parts: THREE.BufferGeometry[] = [];
+  const body = new THREE.SphereGeometry(1, 32, 20);
+  body.scale(0.58, 1.08, 0.34);
+  body.translate(0, 0.02, 0);
+  paint(body, (position) => {
+    const headPatch = position.y > 0.58 && position.z > -0.2;
+    const midPatch = position.y > -0.12 && position.y < 0.32 && Math.abs(position.x) < 0.45;
+    const rearPatch = position.y < -0.42 && position.x > -0.22;
+    if (headPatch || midPatch || rearPatch) return KOI_ORANGE;
+    return position.z < -0.15 ? KOI_BELLY : KOI_BODY;
+  });
+  parts.push(body);
+  parts.push(forkedTail(0.82, 0.78, 0.16, -1.0, KOI_FIN));
+  parts.push(finTriangle(0.7, 0.55, 0.18, 0.18, 0.3, KOI_FIN, "dorsal"));
+  parts.push(finTriangle(0.58, 0.38, 0.16, -0.32, -0.28, KOI_FIN, "ventral"));
+  parts.push(finTriangle(0.56, 0.44, 0.18, 0.32, 0.3, KOI_FIN, "pectoral-left"));
+  parts.push(finTriangle(0.56, 0.44, 0.18, 0.32, -0.3, KOI_FIN, "pectoral-right"));
+  parts.push(eye(0.34, 0.88, 0.2, 0.3));
+  parts.push(eye(-0.34, 0.88, 0.2, 0.3));
+  parts.push(mouth(0.08, 1.12, 0.01));
+  return finish(parts);
+}
+
+function createClownfish(): FishModelInstance {
+  const parts: THREE.BufferGeometry[] = [];
+  const body = new THREE.SphereGeometry(1, 32, 20);
+  body.scale(0.48, 0.88, 0.3);
+  body.translate(0, 0.06, 0);
+  paint(body, (position) => {
+    const bands = [0.45, 0.02, -0.4];
+    for (const center of bands) {
+      const distance = Math.abs(position.y - center);
+      if (distance < 0.095) return CLOWNFISH_WHITE;
+      if (distance < 0.14) return CLOWNFISH_BLACK;
+    }
+    return position.z < -0.14 ? CLOWNFISH_BELLY : CLOWNFISH_BODY;
+  });
+  parts.push(body);
+  parts.push(forkedTail(0.68, 0.68, 0.14, -0.88, CLOWNFISH_FIN));
+  parts.push(finTriangle(0.56, 0.54, 0.16, 0.12, 0.28, CLOWNFISH_BLACK, "dorsal"));
+  parts.push(finTriangle(0.48, 0.36, 0.14, -0.3, -0.26, CLOWNFISH_BLACK, "ventral"));
+  parts.push(finTriangle(0.46, 0.4, 0.16, 0.28, 0.3, CLOWNFISH_FIN, "pectoral-left"));
+  parts.push(finTriangle(0.46, 0.4, 0.16, 0.28, -0.3, CLOWNFISH_FIN, "pectoral-right"));
+  parts.push(eye(0.28, 0.7, 0.2, 0.3));
+  parts.push(eye(-0.28, 0.7, 0.2, 0.3));
+  parts.push(mouth(0.08, 0.96, 0.02));
+  return finish(parts);
+}
+
+function createStarfish(): FishModelInstance {
+  const parts: THREE.BufferGeometry[] = [];
+  const shape = new THREE.Shape();
+  const outerRadius = 0.9;
+  const innerRadius = 0.38;
+  for (let index = 0; index < 10; index += 1) {
+    const angle = Math.PI / 2 + index * (Math.PI / 5);
+    const radius = index % 2 === 0 ? outerRadius : innerRadius;
+    const point = new THREE.Vector2(Math.cos(angle) * radius, Math.sin(angle) * radius);
+    if (index === 0) shape.moveTo(point.x, point.y);
+    else shape.lineTo(point.x, point.y);
+  }
+  shape.closePath();
+  const body = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.22,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    bevelSize: 0.06,
+    bevelThickness: 0.04,
+    curveSegments: 4,
+  });
+  body.translate(0, 0, -0.11);
+  paint(body, (position) => (position.z > 0.06 ? STARFISH_HIGHLIGHT : STARFISH_BODY));
+  parts.push(body);
+  const center = new THREE.SphereGeometry(0.24, 16, 10);
+  center.scale(1, 1, 0.34);
+  center.translate(0, 0, 0.12);
+  paint(center, () => STARFISH_HIGHLIGHT);
+  parts.push(center);
+  return finish(parts);
 }
 
 function createAngelfish(): FishModelInstance {
@@ -120,6 +262,35 @@ function tailFan(width: number, height: number, color: THREE.Color, y: number): 
   const geometry = new THREE.ConeGeometry(width, height, 8);
   geometry.rotateZ(Math.PI);
   geometry.translate(0, y, 0);
+  paint(geometry, () => color);
+  return geometry;
+}
+
+/** A thin, beveled, forked caudal fin with the aquarium's +Y swim direction. */
+function forkedTail(
+  width: number,
+  height: number,
+  thickness: number,
+  y: number,
+  color: THREE.Color,
+): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  shape.moveTo(-width * 0.5, 0);
+  shape.lineTo(width * 0.5, 0);
+  shape.lineTo(width * 0.42, -height * 0.72);
+  shape.lineTo(width * 0.16, -height * 0.56);
+  shape.lineTo(0, -height * 0.36);
+  shape.lineTo(-width * 0.16, -height * 0.56);
+  shape.lineTo(-width * 0.42, -height * 0.72);
+  shape.closePath();
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelSegments: 1,
+    bevelSize: 0.016,
+    bevelThickness: 0.01,
+  });
+  geometry.translate(0, y, -thickness * 0.5);
   paint(geometry, () => color);
   return geometry;
 }
