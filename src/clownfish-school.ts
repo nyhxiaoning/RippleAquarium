@@ -42,7 +42,7 @@ export function createClownfishSchool(
     anemonePositions?: readonly THREE.Vector3[];
   } = {},
 ) {
-  const { geometry, material } = createFishModelInstanceByKey("clown");
+  const { geometry, material } = createFishModelInstanceByKey("clownfish");
   addFishCurveAttributes(geometry, maxCount);
   enableFishCurveDeformation(material);
   const curveAttributes = readFishCurveAttributes(geometry);

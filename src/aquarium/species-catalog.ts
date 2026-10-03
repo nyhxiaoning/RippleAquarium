@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { FishSchoolSimulation } from "../fish-school-simulation.js";
+import { createProceduralFishModel } from "../fish/procedural-species.js";
 import {
   createFishMeshByKey,
   disposeFishMesh,
@@ -38,9 +39,9 @@ export interface PlantCatalogEntry {
 }
 
 export const FISH_CATALOG: FishCatalogEntry[] = [
-  { id: "sardine", name: { zh: "沙丁鱼", en: "Sardine" }, kind: "schooling", maxCount: 260, defaultCount: 60, modelKey: "cartoon", habitatLayer: "middle", defaultSpeedScale: 1, growthScale: 1 },
+  { id: "sardine", name: { zh: "沙丁鱼", en: "Sardine" }, kind: "schooling", maxCount: 260, defaultCount: 60, modelKey: "sardine", habitatLayer: "middle", defaultSpeedScale: 1, growthScale: 1 },
   { id: "koi", name: { zh: "锦鲤", en: "Koi" }, kind: "schooling", maxCount: 120, defaultCount: 24, modelKey: "koi", habitatLayer: "middle", defaultSpeedScale: 0.82, growthScale: 1.08 },
-  { id: "clownfish", name: { zh: "小丑鱼", en: "Clownfish" }, kind: "bottom", maxCount: 40, defaultCount: 18, modelKey: "clown", habitatLayer: "reef", defaultSpeedScale: 0.45, growthScale: 0.78 },
+  { id: "clownfish", name: { zh: "小丑鱼", en: "Clownfish" }, kind: "bottom", maxCount: 40, defaultCount: 18, modelKey: "clownfish", habitatLayer: "reef", defaultSpeedScale: 0.45, growthScale: 0.78 },
   { id: "starfish", name: { zh: "海星", en: "Starfish" }, kind: "bottom", maxCount: 30, defaultCount: 14, modelKey: "starfish", habitatLayer: "lower", defaultSpeedScale: 0.2, growthScale: 0.9 },
   { id: "angelfish", name: { zh: "天使鱼", en: "Angelfish" }, kind: "schooling", maxCount: 60, defaultCount: 12, modelKey: "angelfish", habitatLayer: "middle", defaultSpeedScale: 0.82, growthScale: 1.05 },
   { id: "blue-tang", name: { zh: "蓝吊鱼", en: "Blue Tang" }, kind: "schooling", maxCount: 50, defaultCount: 10, modelKey: "blue-tang", habitatLayer: "upper", defaultSpeedScale: 1.08, growthScale: 0.98 },
@@ -98,7 +99,7 @@ export function createFishSchool(
     .slice(0, Math.max(0, Math.floor(count)));
   switch (speciesId) {
     case "sardine":
-      return createBoidsSchool("cartoon", "sardine", count, deps, 260, fishIds);
+      return createBoidsSchool("sardine", "sardine", count, deps, 260, fishIds);
     case "koi":
       return createBoidsSchool("koi", "koi", count, deps, 120, fishIds);
     case "clownfish": {
@@ -273,13 +274,7 @@ async function createCoralSchool(count: number, deps: SpeciesCreateDeps): Promis
 
 function createStarfishSchool(count: number, deps: SpeciesCreateDeps, fishIds: readonly string[] = []): SchoolHandle {
   const MAX = 30;
-  const geometry = createStarfishGeometry();
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xd97757,
-    roughness: 0.78,
-    metalness: 0.05,
-    side: THREE.DoubleSide,
-  });
+  const { geometry, material } = createProceduralFishModel("starfish");
   const mesh = new THREE.InstancedMesh(geometry, material, MAX);
   mesh.name = "Starfish bottom school";
   mesh.count = count;
@@ -479,49 +474,6 @@ function isInExclusionZone(position: THREE.Vector3, zones: SpeciesCreateDeps["ex
     }
   }
   return false;
-}
-
-function createStarfishGeometry(): THREE.BufferGeometry {
-  const segments = 5;
-  const outerR = 0.45;
-  const innerR = 0.18;
-  const height = 0.16;
-  const points: number[] = [];
-  const indices: number[] = [];
-
-  for (let i = 0; i < segments * 2; i += 1) {
-    const angle = (i / (segments * 2)) * Math.PI * 2 - Math.PI / 2;
-    const r = i % 2 === 0 ? outerR : innerR;
-    points.push(Math.cos(angle) * r, -height * 0.5, Math.sin(angle) * r);
-  }
-  const base = points.length / 3;
-  for (let i = 0; i < segments * 2; i += 1) {
-    const angle = (i / (segments * 2)) * Math.PI * 2 - Math.PI / 2;
-    const r = i % 2 === 0 ? outerR : innerR;
-    points.push(Math.cos(angle) * r, height * 0.5, Math.sin(angle) * r);
-  }
-  for (let i = 0; i < segments * 2; i += 1) {
-    const j = (i + 1) % (segments * 2);
-    indices.push(i, base + i, base + j);
-    indices.push(i, base + j, j);
-  }
-  const bottomCenter = points.length / 3;
-  points.push(0, -height * 0.5, 0);
-  for (let i = 0; i < segments * 2; i += 2) {
-    const j = (i + 2) % (segments * 2);
-    indices.push(bottomCenter, i, j);
-  }
-  const topCenter = points.length / 3;
-  points.push(0, height * 0.5, 0);
-  for (let i = 1; i < segments * 2; i += 2) {
-    const j = (i + 2) % (segments * 2);
-    indices.push(topCenter, j, i);
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(points, 3));
-  geometry.computeVertexNormals();
-  return geometry;
 }
 
 function createSeaweedBladeGeometry(): THREE.BufferGeometry {

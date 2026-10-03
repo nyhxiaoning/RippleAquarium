@@ -123,11 +123,18 @@ export function createFishModelInstance(variantIndex = 0): FishModelInstance {
 }
 
 export function createFishModelInstanceByKey(key: string): FishModelInstance {
-  if (isProceduralFishKey(key)) {
-    return createProceduralFishModel(key);
-  }
+  // Procedural species own their visual identity. Resolve them before the
+  // loaded GLB table so an asset with a legacy/colliding key cannot override
+  // the geometry selected by the species catalog.
+  const proceduralModel = createProceduralFishModelIfKnown(key);
+  if (proceduralModel) return proceduralModel;
+
   const fishModel = fishModels.find((model) => model.key === key) ?? fishModels[0];
   return createFishModelInstanceFromModel(fishModel);
+}
+
+function createProceduralFishModelIfKnown(key: string): FishModelInstance | null {
+  return isProceduralFishKey(key) ? createProceduralFishModel(key) : null;
 }
 
 function createFishModelInstanceFromModel(fishModel: FishModel): FishModelInstance {
