@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { createProceduralFishModel } from "../src/fish/procedural-species.js";
 import {
@@ -21,6 +22,15 @@ describe("procedural fish species", () => {
       expect(model.geometry.getAttribute("position").count).toBeGreaterThan(0);
       expect(model.geometry.getAttribute("normal").count).toBeGreaterThan(0);
       expect(model.geometry.getAttribute("position").count).toBeGreaterThan(120);
+      const position = model.geometry.getAttribute("position");
+      const normal = model.geometry.getAttribute("normal");
+      const bounds = model.geometry.boundingBox;
+      expect(model.geometry.index).toBeNull();
+      expect(position.count).toBeGreaterThan(300);
+      expect(normal.count).toBe(position.count);
+      expect(bounds).not.toBeNull();
+      expect(bounds?.min.toArray().every(Number.isFinite)).toBe(true);
+      expect(bounds?.max.toArray().every(Number.isFinite)).toBe(true);
       expect(model.geometry.getAttribute("color").count).toBe(
         model.geometry.getAttribute("position").count,
       );
@@ -37,6 +47,22 @@ describe("procedural fish species", () => {
     expect(() => createProceduralFishModel("unknown" as never)).toThrow(
       "Unknown procedural fish model",
     );
+  });
+
+  it("keeps a taller silhouette for angelfish than sardine", () => {
+    const sardine = createProceduralFishModel("sardine");
+    const angelfish = createProceduralFishModel("angelfish");
+    const sardineSize = sardine.geometry.boundingBox!.getSize(new THREE.Vector3());
+    const angelfishSize = angelfish.geometry.boundingBox!.getSize(new THREE.Vector3());
+
+    expect(angelfishSize.z / angelfishSize.x).toBeGreaterThan(
+      sardineSize.z / sardineSize.x,
+    );
+
+    sardine.geometry.dispose();
+    sardine.material.dispose();
+    angelfish.geometry.dispose();
+    angelfish.material.dispose();
   });
 
   it("registers new fish with their intended counts and habitat metadata", () => {

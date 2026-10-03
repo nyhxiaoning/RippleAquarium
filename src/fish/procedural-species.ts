@@ -79,6 +79,156 @@ export function isProceduralFishKey(key: string): key is ProceduralFishKey {
   );
 }
 
+type BodyColor = (position: THREE.Vector3, normalizedY: number) => THREE.Color;
+
+interface NaturalBodyOptions {
+  scale: THREE.Vector3;
+  center?: THREE.Vector3;
+  radialSegments?: number;
+  verticalSegments?: number;
+  taper?: number;
+  headFullness?: number;
+  colorAt: BodyColor;
+}
+
+/**
+ * Build a smooth, slightly tapered ellipsoid with the aquarium's +Y swim axis.
+ * The taper is applied to the rear third while headFullness rounds the front
+ * third, giving species a natural caudal transition without frame-time work.
+ */
+function createNaturalBody(options: NaturalBodyOptions): THREE.BufferGeometry {
+  const radialSegments = Math.max(28, Math.floor(options.radialSegments ?? 32));
+  const verticalSegments = Math.max(12, Math.floor(options.verticalSegments ?? 20));
+  const taper = THREE.MathUtils.clamp(options.taper ?? 0.16, 0, 0.8);
+  const headFullness = THREE.MathUtils.clamp(options.headFullness ?? 0.12, 0, 0.8);
+  const geometry = new THREE.SphereGeometry(1, radialSegments, verticalSegments);
+  const position = geometry.getAttribute("position");
+
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    const normalizedY = THREE.MathUtils.clamp((y + 1) * 0.5, 0, 1);
+    const headMask = THREE.MathUtils.smoothstep(normalizedY, 0.56, 1);
+    const rearMask = THREE.MathUtils.smoothstep(1 - normalizedY, 0.52, 1);
+    const radialFactor = Math.max(0.2, 1 + headFullness * headMask - taper * rearMask);
+    position.setXYZ(index, x * radialFactor, y, z * radialFactor);
+  }
+  position.needsUpdate = true;
+  geometry.scale(options.scale.x, options.scale.y, options.scale.z);
+  if (options.center) geometry.translate(options.center.x, options.center.y, options.center.z);
+
+  const centerY = options.center?.y ?? 0;
+  paint(geometry, (vertex) => {
+    const normalizedY = THREE.MathUtils.clamp(
+      (vertex.y - centerY) / Math.max(0.0001, options.scale.y) * 0.5 + 0.5,
+      0,
+      1,
+    );
+    return options.colorAt(vertex, normalizedY);
+  });
+  return geometry;
+}
+
+/** Build a short, tapered transition between a body and its caudal fin. */
+function createTailPeduncle(options: {
+  y: number;
+  length: number;
+  bodyRadius: number;
+  tailRadius: number;
+  color: THREE.Color;
+}): THREE.BufferGeometry {
+  const length = Math.max(0.02, options.length);
+  const geometry = new THREE.CylinderGeometry(
+    Math.max(0.001, options.tailRadius),
+    Math.max(0.001, options.bodyRadius),
+    length,
+    20,
+    1,
+    false,
+  );
+  // CylinderGeometry's +Y end is the body-facing end; y is the rear endpoint.
+  geometry.translate(0, options.y - length * 0.5, 0);
+  paint(geometry, () => options.color);
+  return geometry;
+}
+
+/** Build a thin, softly rounded forked caudal fin. */
+function createCaudalFin(options: {
+  y: number;
+  width: number;
+  height: number;
+  thickness: number;
+  color: THREE.Color;
+  fork: number;
+}): THREE.BufferGeometry {
+  const width = Math.max(0.02, options.width);
+  const height = Math.max(0.02, options.height);
+  const fork = THREE.MathUtils.clamp(options.fork, 0.05, 0.85);
+  const shape = new THREE.Shape();
+  shape.moveTo(-width * 0.06, 0);
+  shape.quadraticCurveTo(-width * 0.42, -height * 0.02, -width * 0.5, -height * 0.35);
+  shape.quadraticCurveTo(-width * 0.48, -height * 0.7, -width * 0.22, -height * 0.66);
+  shape.quadraticCurveTo(-width * 0.08, -height * 0.63, 0, -height * (0.35 + fork * 0.35));
+  shape.quadraticCurveTo(width * 0.08, -height * 0.63, width * 0.22, -height * 0.66);
+  shape.quadraticCurveTo(width * 0.48, -height * 0.7, width * 0.5, -height * 0.35);
+  shape.quadraticCurveTo(width * 0.42, -height * 0.02, width * 0.06, 0);
+  shape.closePath();
+  const thickness = Math.max(0.04, options.thickness);
+  const bevel = Math.min(0.018, thickness * 0.2);
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    bevelSize: bevel,
+    bevelThickness: bevel,
+    curveSegments: 4,
+  });
+  geometry.translate(0, options.y, -thickness * 0.5);
+  paint(geometry, () => options.color);
+  return geometry;
+}
+
+/** Build a thin curved membrane fin rather than a chunky triangular prism. */
+function createMembraneFin(options: {
+  baseY: number;
+  baseZ: number;
+  span: number;
+  height: number;
+  thickness: number;
+  color: THREE.Color;
+  orientation: "dorsal" | "ventral" | "pectoral";
+}): THREE.BufferGeometry {
+  const span = Math.max(0.02, options.span);
+  const height = Math.max(0.02, options.height);
+  const shape = new THREE.Shape();
+  shape.moveTo(-span * 0.5, 0);
+  shape.lineTo(span * 0.5, 0);
+  shape.quadraticCurveTo(span * 0.42, height * 0.58, span * 0.08, height);
+  shape.quadraticCurveTo(-span * 0.28, height * 0.86, -span * 0.5, 0);
+  shape.closePath();
+  const thickness = Math.max(0.025, options.thickness);
+  const bevel = Math.min(0.012, thickness * 0.2);
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelSegments: 1,
+    bevelSize: bevel,
+    bevelThickness: bevel,
+    curveSegments: 4,
+  });
+  if (options.orientation === "dorsal") {
+    geometry.rotateX(Math.PI / 2);
+  } else if (options.orientation === "ventral") {
+    geometry.rotateX(-Math.PI / 2);
+  } else {
+    geometry.rotateZ(Math.PI / 2);
+  }
+  geometry.translate(0, options.baseY, options.baseZ);
+  paint(geometry, () => options.color);
+  return geometry;
+}
+
 function createSardine(): FishModelInstance {
   const parts: THREE.BufferGeometry[] = [];
   const body = new THREE.SphereGeometry(1, 32, 18);
@@ -363,7 +513,10 @@ function finish(parts: THREE.BufferGeometry[]): FishModelInstance {
     return geometry;
   });
   const geometry = mergeGeometries(normalized, false);
-  for (const part of parts) part.dispose();
+  for (const part of normalized) part.dispose();
+  for (const part of parts) {
+    if (!normalized.includes(part)) part.dispose();
+  }
   if (!geometry) throw new Error("Unable to merge procedural fish geometry");
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
