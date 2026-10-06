@@ -2,7 +2,7 @@ import type { Vec3 } from "../aquarium/types.js";
 import type * as THREE from "three";
 
 /** Characters provided by the SpongeBob-themed aquarium content pack. */
-export type ThemeCharacterId = "squidward" | "mr-krabs";
+export type ThemeCharacterId = "spongebob" | "patrick" | "squidward" | "mr-krabs";
 
 /** Static props provided by the SpongeBob-themed aquarium content pack. */
 export type ThemePropId = "squidward-house" | "krusty-krab";

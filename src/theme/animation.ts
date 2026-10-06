@@ -25,6 +25,24 @@ export interface MrKrabsAnimationParts {
   readonly staticClawRotations: readonly StaticRotation[];
 }
 
+/** References held by SpongeBob's low-amplitude idle animation. */
+export interface SpongeBobAnimationParts {
+  readonly group: THREE.Group;
+  readonly body: THREE.Object3D;
+  readonly arms: readonly THREE.Object3D[];
+  readonly staticBodyRotation: StaticRotation;
+  readonly staticArmRotations: readonly StaticRotation[];
+}
+
+/** References held by Patrick's low-amplitude idle animation. */
+export interface PatrickAnimationParts {
+  readonly group: THREE.Group;
+  readonly body: THREE.Object3D;
+  readonly arms: readonly THREE.Object3D[];
+  readonly staticBodyRotation: StaticRotation;
+  readonly staticArmRotations: readonly StaticRotation[];
+}
+
 function restoreRotation(object: THREE.Object3D, rotation: StaticRotation): void {
   object.rotation.set(rotation.x, rotation.y, rotation.z);
 }
@@ -94,3 +112,60 @@ export function updateMrKrabsAnimation(
   }
 }
 
+/** Update SpongeBob's arms and body with a subtle underwater idle motion. */
+export function updateSpongeBobAnimation(
+  parts: SpongeBobAnimationParts,
+  time: number,
+  enabled: boolean,
+): void {
+  if (!enabled) {
+    restoreRotation(parts.body, parts.staticBodyRotation);
+    for (let index = 0; index < parts.arms.length; index += 1) {
+      restoreRotation(parts.arms[index], parts.staticArmRotations[index]);
+    }
+    return;
+  }
+
+  const bodyPose = parts.staticBodyRotation;
+  parts.body.rotation.x = bodyPose.x + Math.sin(time * 0.7) * 0.025;
+  parts.body.rotation.y = bodyPose.y + Math.cos(time * 0.56) * 0.035;
+  parts.body.rotation.z = bodyPose.z + Math.sin(time * 0.62) * 0.02;
+
+  for (let index = 0; index < parts.arms.length; index += 1) {
+    const pose = parts.staticArmRotations[index];
+    const phase = index === 0 ? 0 : Math.PI;
+    const arm = parts.arms[index];
+    arm.rotation.x = pose.x + Math.sin(time * 0.9 + phase) * 0.035;
+    arm.rotation.y = pose.y + Math.cos(time * 0.72 + phase) * 0.025;
+    arm.rotation.z = pose.z + Math.sin(time * 1.05 + phase) * 0.08;
+  }
+}
+
+/** Update Patrick's arms and body with a slower, softer idle motion. */
+export function updatePatrickAnimation(
+  parts: PatrickAnimationParts,
+  time: number,
+  enabled: boolean,
+): void {
+  if (!enabled) {
+    restoreRotation(parts.body, parts.staticBodyRotation);
+    for (let index = 0; index < parts.arms.length; index += 1) {
+      restoreRotation(parts.arms[index], parts.staticArmRotations[index]);
+    }
+    return;
+  }
+
+  const bodyPose = parts.staticBodyRotation;
+  parts.body.rotation.x = bodyPose.x + Math.sin(time * 0.52) * 0.02;
+  parts.body.rotation.y = bodyPose.y + Math.cos(time * 0.44) * 0.028;
+  parts.body.rotation.z = bodyPose.z + Math.sin(time * 0.64) * 0.018;
+
+  for (let index = 0; index < parts.arms.length; index += 1) {
+    const pose = parts.staticArmRotations[index];
+    const phase = index === 0 ? Math.PI * 0.25 : Math.PI * 1.25;
+    const arm = parts.arms[index];
+    arm.rotation.x = pose.x + Math.cos(time * 0.74 + phase) * 0.03;
+    arm.rotation.y = pose.y + Math.sin(time * 0.68 + phase) * 0.024;
+    arm.rotation.z = pose.z + Math.sin(time * 0.96 + phase) * 0.07;
+  }
+}

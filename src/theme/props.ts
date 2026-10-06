@@ -22,6 +22,20 @@ interface ThemeFootprint {
 }
 
 const THEME_FOOTPRINTS: Record<ThemeObjectId, ThemeFootprint> = {
+  spongebob: {
+    width: 2.05,
+    height: 2.65,
+    depth: 1.35,
+    avoidanceRadius: 1.28,
+    avoidanceStrength: 2.4,
+  },
+  patrick: {
+    width: 1.85,
+    height: 2.55,
+    depth: 1.35,
+    avoidanceRadius: 1.2,
+    avoidanceStrength: 2.4,
+  },
   squidward: {
     width: 2.35,
     height: 3.45,
