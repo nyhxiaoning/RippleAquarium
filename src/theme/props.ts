@@ -4,6 +4,7 @@ import type { ThemeObjectHandle, ThemeObjectId, ThemePropId } from "./types.js";
 import {
   createThemeMaterial,
   createThemeMesh,
+  createRoundedBoxGeometry,
   disposeThemeResources,
 } from "./procedural-parts.js";
 
@@ -63,6 +64,13 @@ const THEME_FOOTPRINTS: Record<ThemeObjectId, ThemeFootprint> = {
     depth: 3.15,
     avoidanceRadius: 2.65,
     avoidanceStrength: 2.15,
+  },
+  "pineapple-house": {
+    width: 3.85,
+    height: 6.1,
+    depth: 3.65,
+    avoidanceRadius: 3.1,
+    avoidanceStrength: 2.45,
   },
 };
 
@@ -140,6 +148,12 @@ interface PropMaterials {
   blue: THREE.MeshStandardMaterial;
   yellow: THREE.MeshStandardMaterial;
   flag: THREE.MeshStandardMaterial;
+  shell: THREE.MeshStandardMaterial;
+  shellDark: THREE.MeshStandardMaterial;
+  leaf: THREE.MeshStandardMaterial;
+  leafDark: THREE.MeshStandardMaterial;
+  wood: THREE.MeshStandardMaterial;
+  woodDark: THREE.MeshStandardMaterial;
 }
 
 function createMaterials(): PropMaterials {
@@ -161,6 +175,12 @@ function createMaterials(): PropMaterials {
     blue: standard(0x2c6bb1, 0.74),
     yellow: standard(0xf1c74b, 0.63),
     flag: standard(0xffe075, 0.78),
+    shell: standard(0xeaa33a, 0.8),
+    shellDark: standard(0xa35d20, 0.86),
+    leaf: standard(0x21965a, 0.72),
+    leafDark: standard(0x146f4c, 0.76),
+    wood: standard(0x9a6338, 0.78),
+    woodDark: standard(0x4a3022, 0.66),
   };
 }
 
@@ -231,6 +251,121 @@ function buildKrustyKrab(materials: PropMaterials): THREE.Group {
   return group;
 }
 
+/** Build a bottom-anchored, texture-free pineapple house. */
+function buildPineappleHouse(materials: PropMaterials): THREE.Group {
+  const group = new THREE.Group();
+  group.name = "Pineapple house prop";
+
+  const body = createThemeMesh(
+    "pineapple-body",
+    new THREE.SphereGeometry(1, 24, 16),
+    materials.shell,
+  );
+  body.position.y = 2.35;
+  body.scale.set(1.72, 2.22, 1.65);
+
+  const ridges = new THREE.Group();
+  ridges.name = "pineapple-ridges";
+  const ridgeGeometry = createRoundedBoxGeometry(0.14, 1.25, 0.1, 0.035);
+  const ridgePlacements = [
+    { x: -1.12, y: 1.42, rotation: -0.58 },
+    { x: -0.58, y: 2.38, rotation: -0.58 },
+    { x: 0.58, y: 2.38, rotation: 0.58 },
+    { x: 1.12, y: 1.42, rotation: 0.58 },
+    { x: -0.58, y: 3.32, rotation: 0.58 },
+    { x: 0.58, y: 3.32, rotation: -0.58 },
+  ];
+  for (let index = 0; index < ridgePlacements.length; index += 1) {
+    const placement = ridgePlacements[index];
+    const ridge = createThemeMesh(
+      `pineapple-ridge-${index}`,
+      ridgeGeometry,
+      materials.shellDark,
+    );
+    ridge.position.set(placement.x, placement.y, 1.52);
+    ridge.rotation.z = placement.rotation;
+    ridge.scale.y = 1.18;
+    ridges.add(ridge);
+  }
+
+  const leafCrown = new THREE.Group();
+  leafCrown.name = "pineapple-leaf-crown";
+  const leafGeometry = new THREE.ConeGeometry(0.24, 1.45, 5);
+  for (let index = 0; index < 9; index += 1) {
+    const angle = (index / 9) * Math.PI * 2;
+    const leaf = createThemeMesh(`pineapple-leaf-${index}`, leafGeometry, index % 3 === 0 ? materials.leafDark : materials.leaf);
+    const radius = index === 0 ? 0 : 0.22;
+    leaf.position.set(Math.sin(angle) * radius, 4.78 + (index % 2) * 0.08, Math.cos(angle) * radius);
+    leaf.rotation.set(
+      THREE.MathUtils.degToRad(22 + (index % 2) * 9),
+      angle,
+      THREE.MathUtils.degToRad((index % 2 === 0 ? 1 : -1) * 12),
+    );
+    leaf.scale.set(0.78, 1.04 - (index % 3) * 0.08, 0.42);
+    leafCrown.add(leaf);
+  }
+
+  const windows = new THREE.Group();
+  windows.name = "pineapple-windows";
+  const windowGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.1, 12);
+  const windowFrameGeometry = new THREE.TorusGeometry(0.29, 0.04, 6, 16);
+  for (const [index, x] of [-0.82, 0.82].entries()) {
+    const window = createThemeMesh(
+      `pineapple-window-${index === 0 ? "left" : "right"}`,
+      windowGeometry,
+      materials.glass,
+    );
+    window.position.set(x, index === 0 ? 2.72 : 2.9, 1.42);
+    window.rotation.x = Math.PI / 2;
+    window.scale.setScalar(index === 0 ? 1 : 0.9);
+    const frame = createThemeMesh(
+      `pineapple-window-frame-${index === 0 ? "left" : "right"}`,
+      windowFrameGeometry,
+      materials.woodDark,
+    );
+    frame.position.copy(window.position);
+    frame.rotation.copy(window.rotation);
+    frame.scale.copy(window.scale);
+    windows.add(window, frame);
+  }
+
+  const door = createThemeMesh(
+    "pineapple-door",
+    new THREE.CapsuleGeometry(0.42, 0.62, 7, 14),
+    materials.wood,
+  );
+  door.position.set(0, 0.72, 1.57);
+  door.scale.set(1, 1.08, 0.12);
+
+  const doorFrame = createThemeMesh(
+    "pineapple-door-frame",
+    new THREE.TorusGeometry(0.47, 0.045, 6, 16),
+    materials.woodDark,
+  );
+  doorFrame.position.copy(door.position);
+  doorFrame.scale.set(0.9, 1.22, 0.15);
+
+  const knob = createThemeMesh("pineapple-door-knob", new THREE.SphereGeometry(0.06, 8, 6), materials.woodDark);
+  knob.position.set(0.22, 0.68, 1.7);
+
+  const base = createThemeMesh(
+    "pineapple-base",
+    new THREE.CylinderGeometry(1.55, 1.75, 0.22, 10),
+    materials.stoneLight,
+  );
+  base.position.y = 0.1;
+
+  const doorstep = createThemeMesh(
+    "pineapple-doorstep",
+    createRoundedBoxGeometry(0.96, 0.14, 0.52, 0.05),
+    materials.stone,
+  );
+  doorstep.position.set(0, 0.12, 1.68);
+
+  group.add(body, ridges, leafCrown, windows, door, doorFrame, knob, base, doorstep);
+  return group;
+}
+
 /**
  * Build a procedural themed prop. Unknown IDs return null so a malformed
  * optional theme entry cannot prevent the aquarium itself from loading.
@@ -239,15 +374,17 @@ export function createThemeProp(
   id: ThemePropId,
   options: { scale?: number } = {},
 ): ThemeObjectHandle | null {
-  if (id !== "squidward-house" && id !== "krusty-krab") return null;
+  if (id !== "pineapple-house" && id !== "squidward-house" && id !== "krusty-krab") return null;
   const scale = Number.isFinite(options?.scale) ? Math.max(0, options.scale) : 1;
 
   let group: THREE.Group;
   try {
     const materials = createMaterials();
-    group = id === "squidward-house"
-      ? buildSquidwardHouse(materials)
-      : buildKrustyKrab(materials);
+    group = id === "pineapple-house"
+      ? buildPineappleHouse(materials)
+      : id === "squidward-house"
+        ? buildSquidwardHouse(materials)
+        : buildKrustyKrab(materials);
     group.name = `Theme-${id}`;
     group.scale.setScalar(scale);
     group.userData.themePropId = id;

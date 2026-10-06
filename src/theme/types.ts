@@ -5,7 +5,7 @@ import type * as THREE from "three";
 export type ThemeCharacterId = "spongebob" | "patrick" | "squidward" | "mr-krabs";
 
 /** Static props provided by the SpongeBob-themed aquarium content pack. */
-export type ThemePropId = "squidward-house" | "krusty-krab";
+export type ThemePropId = "pineapple-house" | "squidward-house" | "krusty-krab";
 
 export type ThemeObjectId = ThemeCharacterId | ThemePropId;
 

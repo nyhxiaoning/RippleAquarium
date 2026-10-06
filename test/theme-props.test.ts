@@ -10,7 +10,7 @@ import {
 
 describe("theme props", () => {
   it("builds named procedural props with geometry and safe cleanup", () => {
-    for (const id of ["squidward-house", "krusty-krab"] as const) {
+    for (const id of ["pineapple-house", "squidward-house", "krusty-krab"] as const) {
       const handle = createThemeProp(id, { scale: 0.8 });
       assert.ok(handle);
       assert.strictEqual(handle.group.name, `Theme-${id}`);
@@ -23,6 +23,24 @@ describe("theme props", () => {
       handle.dispose();
       assert.strictEqual(handle.group.children.length, 0);
     }
+  });
+
+  it("exposes the pineapple house's key procedural parts", () => {
+    const handle = createThemeProp("pineapple-house");
+    assert.ok(handle);
+    for (const name of [
+      "pineapple-body",
+      "pineapple-ridges",
+      "pineapple-leaf-crown",
+      "pineapple-windows",
+      "pineapple-door",
+      "pineapple-base",
+    ]) {
+      assert.ok(handle.group.getObjectByName(name), `missing ${name}`);
+    }
+    assert.ok(handle.group.getObjectByName("pineapple-window-left"));
+    assert.ok(handle.group.getObjectByName("pineapple-window-right"));
+    handle.dispose();
   });
 
   it("returns stable scaled obstacle and avoidance records", () => {
@@ -39,6 +57,16 @@ describe("theme props", () => {
     assert.ok((zone.strength ?? 0) > 0);
     assert.notStrictEqual(obstacle.position, position);
     assert.notStrictEqual(zone.position, position);
+  });
+
+  it("provides a scaled pineapple footprint covering its tall crown", () => {
+    const full = getThemePropCollision("pineapple-house", new THREE.Vector3(), 1);
+    const half = getThemeAvoidanceZone("pineapple-house", new THREE.Vector3(), 0.5);
+    assert.ok(full.size.y > full.size.x);
+    assert.ok(full.size.y > 0);
+    assert.ok(half.radius > 0);
+    assert.ok((half.strength ?? 0) > 0);
+    assert.ok(getThemePropCollision("pineapple-house", new THREE.Vector3(), 0.5).size.y < full.size.y);
   });
 
   it("merges enabled theme entries into scene collision and clownfish zones", () => {
@@ -62,4 +90,3 @@ describe("theme props", () => {
     assert.strictEqual(handle, null);
   });
 });
-
