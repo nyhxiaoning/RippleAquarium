@@ -79,9 +79,10 @@ describe("theme props", () => {
     const zones = computeExclusionZones(decor, entries);
     const clownfishZones = computeClownfishAvoidanceZones(decor, entries);
 
-    assert.strictEqual(obstacles.length, 3);
-    assert.strictEqual(zones.length, 3);
-    assert.strictEqual(clownfishZones.length, 3);
+    const enabledEntries = entries.filter((entry) => entry.enabled).length;
+    assert.strictEqual(obstacles.length, enabledEntries);
+    assert.strictEqual(zones.length, enabledEntries);
+    assert.strictEqual(clownfishZones.length, enabledEntries);
     assert.ok(obstacles.every((obstacle) => obstacle.position.y < 0));
   });
 

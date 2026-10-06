@@ -6,21 +6,49 @@ import type { ThemeEntry, ThemeMeta, ThemeObjectId } from "./types.js";
  */
 export const THEME_CATALOG: readonly ThemeMeta[] = [
   {
+    id: "pineapple-house",
+    kind: "prop",
+    name: { zh: "菠萝屋", en: "Pineapple House" },
+    defaultPosition: { x: -8.4, y: 0, z: 6.2 },
+    defaultRotationY: 0.28,
+    defaultScale: 1,
+    smallTankScale: 0.7,
+    hideInSmallTank: true,
+  },
+  {
+    id: "patrick",
+    kind: "character",
+    name: { zh: "派大星", en: "Patrick" },
+    defaultPosition: { x: -4.8, y: 0, z: 4.8 },
+    defaultRotationY: 0.1,
+    defaultScale: 1.08,
+    smallTankScale: 0.7,
+  },
+  {
+    id: "spongebob",
+    kind: "character",
+    name: { zh: "海绵宝宝", en: "SpongeBob" },
+    defaultPosition: { x: 0, y: 0, z: 4.55 },
+    defaultRotationY: 0,
+    defaultScale: 1,
+    smallTankScale: 0.7,
+  },
+  {
     id: "squidward",
     kind: "character",
     name: { zh: "章鱼哥", en: "Squidward" },
-    defaultPosition: { x: -8.6, y: 0, z: 4.4 },
+    defaultPosition: { x: 4.6, y: 0, z: 5.1 },
     defaultRotationY: 0.16,
-    defaultScale: 1,
+    defaultScale: 0.98,
     smallTankScale: 0.7,
   },
   {
     id: "mr-krabs",
     kind: "character",
     name: { zh: "蟹老板", en: "Mr. Krabs" },
-    defaultPosition: { x: 8.6, y: 0, z: 4.3 },
+    defaultPosition: { x: 8.6, y: 0, z: 4.65 },
     defaultRotationY: -0.16,
-    defaultScale: 1,
+    defaultScale: 1.02,
     smallTankScale: 0.7,
   },
   {
@@ -80,3 +108,32 @@ export function cloneThemeEntries(entries: readonly ThemeEntry[] | undefined): T
   }));
 }
 
+/**
+ * Expand theme objects from descriptors written before the procedural theme
+ * entries existed. The input is never mutated, and an already-normalized
+ * descriptor remains unchanged when normalized again.
+ */
+export function normalizeThemeEntries(
+  entries: readonly ThemeEntry[] | undefined,
+  decor: readonly { asset: string }[] = [],
+): ThemeEntry[] {
+  const normalized = cloneThemeEntries(entries);
+  const ids = new Set(normalized.map((entry) => entry.id));
+
+  if (
+    decor.some((item) => item.asset === "spongebob-patrick") &&
+    !ids.has("spongebob") &&
+    !ids.has("patrick")
+  ) {
+    normalized.push(createThemeEntry("spongebob"));
+    normalized.push(createThemeEntry("patrick"));
+    ids.add("spongebob");
+    ids.add("patrick");
+  }
+
+  if (decor.some((item) => item.asset === "pineapple-house") && !ids.has("pineapple-house")) {
+    normalized.push(createThemeEntry("pineapple-house"));
+  }
+
+  return normalized;
+}

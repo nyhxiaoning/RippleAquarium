@@ -5,6 +5,7 @@ import { getFishMeta, getPlantMeta } from "./species-catalog.js";
 import { getEcologyMeta } from "../ecology/catalog.js";
 import type { EcologyKind } from "../ecology/types.js";
 import { getStyleById, listStyleIds } from "./presets.js";
+import { normalizeThemeEntries } from "../theme/catalog.js";
 import { buildAquariumScene } from "./scene-builder.js";
 import { createFishGrowthRegistry } from "../growth/registry.js";
 import { clampOfflineSeconds } from "../growth/calculator.js";
@@ -67,10 +68,9 @@ function cloneDescriptor(descriptor: AquariumDescriptor): AquariumDescriptor {
       lighting: { ...descriptor.theme.lighting },
     },
     decor: descriptor.decor.map((item) => ({ ...item })),
-    themeEntries: (descriptor.themeEntries ?? []).map((entry) => ({
-      ...entry,
-      position: { ...entry.position },
-    })),
+    // Expand historical decor descriptors into procedural theme entries while
+    // retaining `decor` above for persisted-descriptor compatibility.
+    themeEntries: normalizeThemeEntries(descriptor.themeEntries, descriptor.decor),
     fish: descriptor.fish.map((entry) => ({ ...entry })),
     plants: descriptor.plants.map((entry) => ({ ...entry })),
     ecology: descriptor.ecology?.map((entry) => ({ ...entry })),

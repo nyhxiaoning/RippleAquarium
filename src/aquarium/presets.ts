@@ -29,28 +29,40 @@ interface ThemePlacement {
 export function createThemeEntriesForPreset(preset: ThemePresetId): ThemeEntry[] {
   const placements: Record<ThemePresetId, ThemePlacement[]> = {
     default: [
-      { id: "squidward", position: { x: -7.9, y: 0, z: 5.1 }, rotationY: 0.16 },
-      { id: "mr-krabs", position: { x: 7.8, y: 0, z: 5.0 }, rotationY: -0.16 },
+      { id: "pineapple-house", position: { x: -8.4, y: 0, z: 6.2 }, rotationY: 0.28 },
+      { id: "patrick", position: { x: -4.8, y: 0, z: 4.8 }, rotationY: 0.1, scale: 1.08 },
+      { id: "spongebob", position: { x: 0, y: 0, z: 4.55 }, rotationY: 0, scale: 1 },
+      { id: "squidward", position: { x: 4.6, y: 0, z: 5.1 }, rotationY: 0.16, scale: 0.98 },
+      { id: "mr-krabs", position: { x: 8.6, y: 0, z: 4.65 }, rotationY: -0.16, scale: 1.02 },
       { id: "squidward-house", position: { x: -7.8, y: 0, z: 5.6 }, rotationY: 0.12 },
       { id: "krusty-krab", position: { x: 7.6, y: 0, z: 5.55 }, rotationY: -0.12 },
     ],
     "coral-reef": [
-      { id: "squidward", position: { x: -10.8, y: 0, z: 6.8 }, rotationY: 0.16, scale: 0.92 },
-      { id: "mr-krabs", position: { x: 10.7, y: 0, z: 6.75 }, rotationY: -0.16, scale: 0.92 },
+      { id: "pineapple-house", position: { x: -10.8, y: 0, z: 7.3 }, rotationY: 0.28, scale: 0.92 },
+      { id: "patrick", position: { x: -6.1, y: 0, z: 5.7 }, rotationY: 0.1, scale: 0.98 },
+      { id: "spongebob", position: { x: 0, y: 0, z: 5.35 }, rotationY: 0, scale: 0.92 },
+      { id: "squidward", position: { x: 5.8, y: 0, z: 6.05 }, rotationY: 0.16, scale: 0.92 },
+      { id: "mr-krabs", position: { x: 10.7, y: 0, z: 5.55 }, rotationY: -0.16, scale: 0.92 },
       { id: "squidward-house", position: { x: -10.65, y: 0, z: 7.45 }, rotationY: 0.12, scale: 0.82 },
       { id: "krusty-krab", position: { x: 10.45, y: 0, z: 7.35 }, rotationY: -0.12, scale: 0.82 },
     ],
     "deep-sea": [
-      { id: "squidward", position: { x: -6.8, y: 0, z: 4.05 }, rotationY: 0.16, scale: 0.9 },
-      { id: "mr-krabs", position: { x: 6.7, y: 0, z: 4.0 }, rotationY: -0.16, scale: 0.9 },
+      { id: "pineapple-house", position: { x: -6.1, y: 0, z: 4.75 }, rotationY: 0.28, scale: 0.72 },
+      { id: "patrick", position: { x: -3.45, y: 0, z: 3.75 }, rotationY: 0.1, scale: 0.82 },
+      { id: "spongebob", position: { x: 0, y: 0, z: 3.55 }, rotationY: 0, scale: 0.78 },
+      { id: "squidward", position: { x: 3.3, y: 0, z: 4.15 }, rotationY: 0.16, scale: 0.8 },
+      { id: "mr-krabs", position: { x: 6.1, y: 0, z: 3.75 }, rotationY: -0.16, scale: 0.82 },
       { id: "squidward-house", position: { x: -6.65, y: 0, z: 4.65 }, rotationY: 0.12, scale: 0.8 },
       { id: "krusty-krab", position: { x: 6.45, y: 0, z: 4.6 }, rotationY: -0.12, scale: 0.8 },
     ],
     "small-tank": [
-      // Characters stay visible at 70% scale, while their larger props are
+      // Characters stay visible at 70% scale, while all larger props are
       // disabled to preserve a clear swim lane in the compact tank.
-      { id: "squidward", position: { x: -2.35, y: 0, z: 1.8 }, rotationY: 0.16, scale: 0.7 },
-      { id: "mr-krabs", position: { x: 2.35, y: 0, z: 1.8 }, rotationY: -0.16, scale: 0.7 },
+      { id: "pineapple-house", position: { x: -3.2, y: 0, z: 2.8 }, rotationY: 0.28, scale: 0.7, enabled: false },
+      { id: "patrick", position: { x: -1.8, y: 0, z: 2.3 }, rotationY: 0.1, scale: 0.7 },
+      { id: "spongebob", position: { x: 0, y: 0, z: 2.15 }, rotationY: 0, scale: 0.7 },
+      { id: "squidward", position: { x: 1.75, y: 0, z: 2.45 }, rotationY: 0.16, scale: 0.7 },
+      { id: "mr-krabs", position: { x: 3.2, y: 0, z: 2.25 }, rotationY: -0.16, scale: 0.7 },
       { id: "squidward-house", position: { x: -2.25, y: 0, z: 2.2 }, rotationY: 0.12, scale: 0.68, enabled: false },
       { id: "krusty-krab", position: { x: 2.2, y: 0, z: 2.2 }, rotationY: -0.12, scale: 0.68, enabled: false },
     ],
@@ -67,8 +79,8 @@ export function createThemeEntriesForPreset(preset: ThemePresetId): ThemeEntry[]
   });
 }
 
-/** The default style is generated from the existing config constants so the
- *  initial look stays byte-for-byte identical to before this feature. */
+/** Historical decor remains in each descriptor for persisted preset compatibility.
+ *  Theme entries are the runtime source of truth for the procedural scenery. */
 export const DEFAULT_STYLE: AquariumStyle = {
   id: "default",
   name: { zh: "默认鱼缸", en: "Default" },

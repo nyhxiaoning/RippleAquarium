@@ -26,6 +26,7 @@ export interface AquariumTheme {
 
 export interface DecorItem {
   id: string;
+  /** Historical theme assets remain readable for persisted descriptors. */
   asset: "pineapple-house" | "spongebob-patrick" | "squidward" | "mr-krabs" | "squidward-house" | "krusty-krab";
   position: Vec3;
   rotationY?: number;

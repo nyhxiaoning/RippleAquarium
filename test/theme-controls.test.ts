@@ -20,7 +20,7 @@ describe("SpongeBob theme controls", () => {
     assert.strictEqual(manager.getThemeEntries().find((entry) => entry.id === "squidward")?.enabled, false);
     assert.strictEqual(manager.getThemeEntries().find((entry) => entry.id === "mr-krabs")?.scale, 0.75);
     assert.strictEqual(DEFAULT_STYLE.themeEntries?.find((entry) => entry.id === "squidward")?.enabled, true);
-    assert.strictEqual(DEFAULT_STYLE.themeEntries?.find((entry) => entry.id === "mr-krabs")?.scale, 1);
+    assert.strictEqual(DEFAULT_STYLE.themeEntries?.find((entry) => entry.id === "mr-krabs")?.scale, 1.02);
     assert.strictEqual(changes.length, 2);
   });
 

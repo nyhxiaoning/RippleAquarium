@@ -8,13 +8,21 @@ import {
   createThemeEntriesForPreset,
 } from "../src/aquarium/presets.js";
 
-const THEME_IDS = ["squidward", "mr-krabs", "squidward-house", "krusty-krab"] as const;
+const THEME_IDS = [
+  "pineapple-house",
+  "patrick",
+  "spongebob",
+  "squidward",
+  "mr-krabs",
+  "squidward-house",
+  "krusty-krab",
+] as const;
 
 describe("theme preset placement", () => {
   it("enables both characters and props in the default preset", () => {
     assert.deepStrictEqual(DEFAULT_STYLE.themeEntries?.map((entry) => entry.id), [...THEME_IDS]);
     assert.ok(DEFAULT_STYLE.themeEntries?.every((entry) => entry.enabled));
-    assert.ok(DEFAULT_STYLE.themeEntries?.every((entry) => entry.scale === 1));
+    assert.deepStrictEqual(DEFAULT_STYLE.themeEntries?.slice(0, 5).map((entry) => entry.id), THEME_IDS.slice(0, 5));
   });
 
   it("keeps theme entries inside each preset footprint", () => {
@@ -29,7 +37,7 @@ describe("theme preset placement", () => {
   it("uses reduced props in larger themed presets", () => {
     for (const style of [CORAL_REEF_STYLE, DEEP_SEA_STYLE]) {
       const props = style.themeEntries?.filter((entry) => entry.kind === "prop") ?? [];
-      assert.strictEqual(props.length, 2);
+      assert.strictEqual(props.length, 3);
       assert.ok(props.every((entry) => entry.enabled && entry.scale < 1));
     }
   });
