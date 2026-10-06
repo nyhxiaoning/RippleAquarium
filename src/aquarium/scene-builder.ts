@@ -1,8 +1,6 @@
 import * as THREE from "three";
-import { pineappleHouseDecor, simulationSettings } from "../config.js";
+import { simulationSettings } from "../config.js";
 import { addLighting, addObstacles, createAquariumShell } from "../scene-setup.js";
-import { createPineappleHouseDecor } from "../decor/pineapple-house.js";
-import { createSpongebobPatrickDecor } from "../decor/spongebob-patrick.js";
 import { createFishSchool, createPlantSchool, getFishMeta } from "./species-catalog.js";
 import { createEcologySchool } from "../ecology/catalog.js";
 import type { EcologyEntry, EcologyKind } from "../ecology/types.js";
@@ -15,6 +13,7 @@ import type {
 } from "./types.js";
 import type { ThemeEntry } from "../theme/types.js";
 import type { ThemeObjectHandle, ThemeCharacterId, ThemePropId } from "../theme/types.js";
+import { normalizeThemeEntries } from "../theme/catalog.js";
 import { createThemeCharacter } from "../theme/characters.js";
 import { createThemeProp } from "../theme/props.js";
 import {
@@ -37,6 +36,10 @@ function findDecor(decor: AquariumDescriptor["decor"], asset: string) {
   return decor.find((item) => item.asset === asset);
 }
 
+function hasThemeEntry(themeEntries: readonly ThemeEntry[], id: ThemeEntry["id"]): boolean {
+  return themeEntries.some((entry) => entry.id === id);
+}
+
 export function computeObstacles(
   decor: AquariumDescriptor["decor"],
   halfSize: THREE.Vector3,
@@ -44,7 +47,10 @@ export function computeObstacles(
 ): Obstacle[] {
   const obstacles: Obstacle[] = [];
   const pineapple = findDecor(decor, "pineapple-house");
-  if (pineapple) {
+  // Keep the historical footprint for descriptors that have not migrated yet.
+  // Once a procedural entry exists, its enabled state and placement are the
+  // only source of truth and the legacy footprint must not be duplicated.
+  if (pineapple && !hasThemeEntry(themeEntries, "pineapple-house")) {
     obstacles.push({
       position: new THREE.Vector3(
         pineapple.position.x,
@@ -79,7 +85,7 @@ export function computeExclusionZones(
 ): ExclusionZone[] {
   const zones: ExclusionZone[] = [];
   const pineapple = findDecor(decor, "pineapple-house");
-  if (pineapple) {
+  if (pineapple && !hasThemeEntry(themeEntries, "pineapple-house")) {
     zones.push({
       position: new THREE.Vector3(pineapple.position.x, 0, pineapple.position.z),
       radius: PINEAPPLE_FOOTPRINT_RADIUS,
@@ -111,7 +117,9 @@ export function computeClownfishAvoidanceZones(
 ): ExclusionZone[] {
   const zones: ExclusionZone[] = [];
   const pineapple = findDecor(decor, "pineapple-house");
-  if (pineapple) {
+  const hasSpongebobOrPatrick =
+    hasThemeEntry(themeEntries, "spongebob") || hasThemeEntry(themeEntries, "patrick");
+  if (pineapple && !hasThemeEntry(themeEntries, "pineapple-house")) {
     zones.push({
       position: new THREE.Vector3(pineapple.position.x, 0, pineapple.position.z),
       radius: PINEAPPLE_FOOTPRINT_RADIUS + 0.55,
@@ -119,14 +127,14 @@ export function computeClownfishAvoidanceZones(
     });
   }
   const spongebob = findDecor(decor, "spongebob-patrick");
-  if (spongebob) {
+  if (spongebob && !hasSpongebobOrPatrick) {
     zones.push({
       position: new THREE.Vector3(spongebob.position.x, 0, spongebob.position.z),
       radius: SPONGEBOB_FOOTPRINT_RADIUS + 0.45,
       strength: 2.8,
     });
   }
-  if (pineapple) {
+  if (pineapple && !hasThemeEntry(themeEntries, "pineapple-house")) {
     zones.push({
       position: new THREE.Vector3(
         pineapple.position.x + FRONT_CORAL_MASK_OFFSET.x,
@@ -174,6 +182,9 @@ export async function buildAquariumScene(
   deps: { renderer: THREE.WebGLRenderer; scene: THREE.Scene; growthRegistry: import("../growth/registry.js").FishGrowthRegistry },
 ): Promise<AquariumSceneHandle> {
   const { renderer, scene, growthRegistry } = deps;
+  // Normalize only the scene's private runtime entries.  Persisted descriptors
+  // remain untouched while legacy decor can still supply missing theme IDs.
+  const normalizedThemeEntries = normalizeThemeEntries(descriptor.themeEntries, descriptor.decor);
   const root = new THREE.Group();
   root.name = `Aquarium-${descriptor.id}`;
 
@@ -191,11 +202,11 @@ export async function buildAquariumScene(
 
   const shell = createAquariumShell(root, renderer, halfSize);
   const precipitation = createWeatherPrecipitation(root, halfSize);
-  const obstacles = computeObstacles(descriptor.decor, halfSize, descriptor.themeEntries);
+  const obstacles = computeObstacles(descriptor.decor, halfSize, normalizedThemeEntries);
   addObstacles(root, obstacles);
 
-  const exclusionZones = computeExclusionZones(descriptor.decor, descriptor.themeEntries);
-  const clownfishAvoidanceZones = computeClownfishAvoidanceZones(descriptor.decor, descriptor.themeEntries);
+  const exclusionZones = computeExclusionZones(descriptor.decor, normalizedThemeEntries);
+  const clownfishAvoidanceZones = computeClownfishAvoidanceZones(descriptor.decor, normalizedThemeEntries);
   let habitatLayout = createHabitatLayout({ x: halfSize.x, y: halfSize.y, z: halfSize.z });
 
   const speciesDeps: SpeciesCreateDeps = {
@@ -308,27 +319,6 @@ export async function buildAquariumScene(
 
   buildFishSchools(descriptor.fish);
 
-  // Decor models (pineapple house, spongebob & patrick) stream in async.
-  for (const item of descriptor.decor) {
-    const position = new THREE.Vector3(item.position.x, item.position.y, item.position.z);
-    const object =
-      item.asset === "pineapple-house"
-        ? await createPineappleHouseDecor({
-            ...pineappleHouseDecor,
-            position,
-            rotationY: item.rotationY ?? pineappleHouseDecor.rotationY,
-            height: item.height,
-          })
-        : await createSpongebobPatrickDecor({
-            position,
-            height: item.height,
-          });
-    if (object) {
-      object.name = `Decor-${item.asset}`;
-      root.add(object);
-    }
-  }
-
   function positionThemeObject(handle: ThemeObjectHandle, entry: ThemeEntry) {
     handle.group.position.set(entry.position.x, entry.position.y, entry.position.z);
     handle.group.rotation.y = entry.rotationY;
@@ -361,7 +351,7 @@ export async function buildAquariumScene(
 
   // Build themed objects after regular decor so they remain a separate,
   // keyed lifecycle and can be toggled without rebuilding fish schools.
-  for (const entry of descriptor.themeEntries ?? []) {
+  for (const entry of normalizedThemeEntries) {
     if (entry.enabled) createThemeHandle(entry);
   }
 
@@ -521,7 +511,7 @@ export async function buildAquariumScene(
   }
 
   function setThemeEnabled(id: string, enabled: boolean): boolean {
-    const entry = descriptor.themeEntries?.find((item) => item.id === id);
+    const entry = normalizedThemeEntries.find((item) => item.id === id);
     if (!entry) return false;
     entry.enabled = Boolean(enabled);
     const handle = enabled ? createThemeHandle(entry) : themeHandles.get(id);
@@ -538,7 +528,7 @@ export async function buildAquariumScene(
   }
 
   function setThemeScale(id: string, scale: number): boolean {
-    const entry = descriptor.themeEntries?.find((item) => item.id === id);
+    const entry = normalizedThemeEntries.find((item) => item.id === id);
     if (!entry || !Number.isFinite(scale)) return false;
     entry.scale = Math.max(0, scale);
     const handle = themeHandles.get(id) ?? (entry.enabled ? createThemeHandle(entry) : null);
