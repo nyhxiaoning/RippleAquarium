@@ -1,6 +1,11 @@
 import * as THREE from "three";
 import type { BoxObstacle, SphereObstacle } from "../types.js";
 import type { ThemeObjectHandle, ThemeObjectId, ThemePropId } from "./types.js";
+import {
+  createThemeMaterial,
+  createThemeMesh,
+  disposeThemeResources,
+} from "./procedural-parts.js";
 
 /**
  * Compact footprints used by both the scene collision pass and clownfish
@@ -124,12 +129,7 @@ interface PropMaterials {
 }
 
 function createMaterials(): PropMaterials {
-  const standard = (color: number, roughness = 0.82) => new THREE.MeshStandardMaterial({
-    color,
-    roughness,
-    metalness: 0.02,
-    flatShading: true,
-  });
+  const standard = (color: number, roughness = 0.82) => createThemeMaterial(color, roughness);
 
   return {
     stone: standard(0x5f6875, 0.94),
@@ -150,55 +150,39 @@ function createMaterials(): PropMaterials {
   };
 }
 
-function markMeshes(group: THREE.Group): void {
-  group.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    object.castShadow = true;
-    object.receiveShadow = true;
-  });
-}
-
 function buildSquidwardHouse(materials: PropMaterials): THREE.Group {
   const group = new THREE.Group();
   group.name = "Squidward house prop";
 
-  const head = new THREE.Mesh(new THREE.DodecahedronGeometry(1.25, 1), materials.stone);
-  head.name = "Stone head";
+  const head = createThemeMesh("Stone head", new THREE.DodecahedronGeometry(1.25, 1), materials.stone);
   head.scale.set(1.08, 1.28, 0.88);
   head.position.y = 1.55;
 
-  const brow = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.16, 0.2), materials.stoneLight);
-  brow.name = "Stone brow";
+  const brow = createThemeMesh("Stone brow", new THREE.BoxGeometry(1.55, 0.16, 0.2), materials.stoneLight);
   brow.position.set(0, 2.25, 0.78);
   brow.rotation.z = -0.08;
 
-  const door = new THREE.Mesh(new THREE.CapsuleGeometry(0.38, 0.6, 5, 12), materials.door);
-  door.name = "Stone door";
+  const door = createThemeMesh("Stone door", new THREE.CapsuleGeometry(0.38, 0.6, 5, 12), materials.door);
   door.scale.set(1, 1.08, 0.13);
   door.position.set(0, 0.56, 0.94);
 
-  const doorFrame = new THREE.Mesh(new THREE.TorusGeometry(0.43, 0.045, 6, 16), materials.dark);
-  doorFrame.name = "Stone door frame";
+  const doorFrame = createThemeMesh("Stone door frame", new THREE.TorusGeometry(0.43, 0.045, 6, 16), materials.dark);
   doorFrame.position.copy(door.position);
   doorFrame.scale.set(1, 1.3, 0.18);
 
-  const window = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.09, 8), materials.glass);
-  window.name = "Stone window";
+  const window = createThemeMesh("Stone window", new THREE.CylinderGeometry(0.27, 0.27, 0.09, 8), materials.glass);
   window.position.set(0.64, 1.57, 0.73);
   window.rotation.x = Math.PI / 2;
 
-  const windowFrame = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.04, 6, 12), materials.dark);
-  windowFrame.name = "Stone window frame";
+  const windowFrame = createThemeMesh("Stone window frame", new THREE.TorusGeometry(0.3, 0.04, 6, 12), materials.dark);
   windowFrame.position.copy(window.position);
   windowFrame.rotation.copy(window.rotation);
   windowFrame.scale.z = 0.25;
 
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.22, 1.4, 0.22, 8), materials.stoneLight);
-  base.name = "Stone base";
+  const base = createThemeMesh("Stone base", new THREE.CylinderGeometry(1.22, 1.4, 0.22, 8), materials.stoneLight);
   base.position.y = 0.1;
 
   group.add(head, brow, door, doorFrame, window, windowFrame, base);
-  markMeshes(group);
   return group;
 }
 
@@ -206,52 +190,31 @@ function buildKrustyKrab(materials: PropMaterials): THREE.Group {
   const group = new THREE.Group();
   group.name = "Krusty Krab prop";
 
-  const counter = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.75, 1.42), materials.red);
-  counter.name = "Krusty Krab counter";
+  const counter = createThemeMesh("Krusty Krab counter", new THREE.BoxGeometry(2.5, 0.75, 1.42), materials.red);
   counter.position.y = 0.48;
 
-  const counterTop = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.18, 1.6), materials.yellow);
-  counterTop.name = "Krusty Krab counter top";
+  const counterTop = createThemeMesh("Krusty Krab counter top", new THREE.BoxGeometry(2.8, 0.18, 1.6), materials.yellow);
   counterTop.position.y = 0.94;
 
-  const sign = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.62, 0.13), materials.red);
-  sign.name = "Krusty Krab sign";
+  const sign = createThemeMesh("Krusty Krab sign", new THREE.BoxGeometry(2.05, 0.62, 0.13), materials.red);
   sign.position.set(0, 2.02, 0.1);
 
-  const signTrim = new THREE.Mesh(new THREE.BoxGeometry(1.78, 0.39, 0.08), materials.yellow);
-  signTrim.name = "Krusty Krab sign trim";
+  const signTrim = createThemeMesh("Krusty Krab sign trim", new THREE.BoxGeometry(1.78, 0.39, 0.08), materials.yellow);
   signTrim.position.set(0, 2.02, 0.18);
 
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 1.48, 6), materials.dark);
-  pole.name = "Krusty Krab flag pole";
+  const pole = createThemeMesh("Krusty Krab flag pole", new THREE.CylinderGeometry(0.055, 0.055, 1.48, 6), materials.dark);
   pole.position.set(0, 2.74, 0);
 
-  const flag = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.72, 3), materials.flag);
-  flag.name = "Krusty Krab flag";
+  const flag = createThemeMesh("Krusty Krab flag", new THREE.ConeGeometry(0.32, 0.72, 3), materials.flag);
   flag.position.set(0.28, 3.15, 0);
   flag.rotation.z = -Math.PI / 2;
   flag.scale.set(0.9, 1, 0.55);
 
-  const window = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.48, 0.1), materials.blue);
-  window.name = "Krusty Krab window";
+  const window = createThemeMesh("Krusty Krab window", new THREE.BoxGeometry(1.18, 0.48, 0.1), materials.blue);
   window.position.set(0, 0.52, 0.75);
 
   group.add(counter, counterTop, sign, signTrim, pole, flag, window);
-  markMeshes(group);
   return group;
-}
-
-function disposeObjectResources(root: THREE.Object3D): void {
-  const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>();
-  root.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    if (object.geometry) geometries.add(object.geometry);
-    const meshMaterials = Array.isArray(object.material) ? object.material : [object.material];
-    for (const material of meshMaterials) if (material) materials.add(material);
-  });
-  for (const geometry of geometries) geometry.dispose();
-  for (const material of materials) material.dispose();
 }
 
 /**
@@ -295,7 +258,7 @@ export function createThemeProp(
     dispose() {
       if (disposed) return;
       disposed = true;
-      disposeObjectResources(group);
+      disposeThemeResources(group);
       group.clear();
     },
   };

@@ -7,6 +7,12 @@ import {
   updateMrKrabsAnimation,
   updateSquidwardAnimation,
 } from "./animation.js";
+import {
+  createEyePair,
+  createThemeMaterial,
+  createThemeMesh,
+  disposeThemeResources,
+} from "./procedural-parts.js";
 
 export type { MrKrabsAnimationParts, SquidwardAnimationParts } from "./animation.js";
 
@@ -30,65 +36,19 @@ const MR_KRABS_DARK_RED = 0x8e2336;
 const MR_KRABS_BLUE = 0x315aa7;
 const MR_KRABS_YELLOW = 0xf4d45f;
 
-function standardMaterial(color: number, roughness = 0.78): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
-    color,
-    flatShading: true,
-    roughness,
-    metalness: 0.02,
-  });
-}
-
-function mesh(
-  name: string,
-  geometry: THREE.BufferGeometry,
-  material: THREE.Material,
-  position?: { x: number; y: number; z: number },
-): THREE.Mesh {
-  const result = new THREE.Mesh(geometry, material);
-  result.name = name;
-  if (position) result.position.set(position.x, position.y, position.z);
-  result.castShadow = true;
-  result.receiveShadow = true;
-  return result;
-}
-
 function snapshotRotation(object: THREE.Object3D): StaticRotation {
   return { x: object.rotation.x, y: object.rotation.y, z: object.rotation.z };
 }
 
-function addEyePair(
-  parent: THREE.Object3D,
-  eyeGroupName: string,
-  eyeWhiteMaterial: THREE.Material,
-  eyeDarkMaterial: THREE.Material,
-  y: number,
-  z: number,
-  spacing: number,
-  eyeScale: number,
-): THREE.Group {
-  const eyes = new THREE.Group();
-  eyes.name = eyeGroupName;
-  const whiteGeometry = new THREE.SphereGeometry(0.2 * eyeScale, 8, 6);
-  const pupilGeometry = new THREE.SphereGeometry(0.085 * eyeScale, 7, 5);
-  const left = mesh("eye-left", whiteGeometry.clone(), eyeWhiteMaterial, { x: -spacing, y, z });
-  const right = mesh("eye-right", whiteGeometry, eyeWhiteMaterial, { x: spacing, y, z });
-  const leftPupil = mesh("pupil-left", pupilGeometry.clone(), eyeDarkMaterial, { x: -spacing, y, z: z + 0.16 * eyeScale });
-  const rightPupil = mesh("pupil-right", pupilGeometry, eyeDarkMaterial, { x: spacing, y, z: z + 0.16 * eyeScale });
-  eyes.add(left, right, leftPupil, rightPupil);
-  parent.add(eyes);
-  return eyes;
-}
-
 /** Build Squidward's model and return the references used by its animation. */
 export function createSquidwardParts(group: THREE.Group): SquidwardAnimationParts {
-  const skin = standardMaterial(SQUIDWARD_SKIN);
-  const darkSkin = standardMaterial(SQUIDWARD_DARK);
-  const purple = standardMaterial(SQUIDWARD_PURPLE);
-  const white = standardMaterial(EYE_WHITE, 0.68);
-  const dark = standardMaterial(EYE_DARK, 0.52);
+  const skin = createThemeMaterial(SQUIDWARD_SKIN);
+  const darkSkin = createThemeMaterial(SQUIDWARD_DARK);
+  const purple = createThemeMaterial(SQUIDWARD_PURPLE);
+  const white = createThemeMaterial(EYE_WHITE, 0.68);
+  const dark = createThemeMaterial(EYE_DARK, 0.52);
 
-  const body = mesh(
+  const body = createThemeMesh(
     "body",
     new THREE.CapsuleGeometry(0.42, 0.72, 4, 8),
     darkSkin,
@@ -97,17 +57,25 @@ export function createSquidwardParts(group: THREE.Group): SquidwardAnimationPart
   body.scale.set(1.02, 1.08, 0.83);
   group.add(body);
 
-  const head = mesh("head", new THREE.SphereGeometry(0.73, 12, 8), skin, { x: 0, y: 1.85, z: 0 });
+  const head = createThemeMesh("head", new THREE.SphereGeometry(0.73, 12, 8), skin, { x: 0, y: 1.85, z: 0 });
   head.scale.set(0.98, 1.08, 0.82);
   group.add(head);
 
-  const nose = mesh("nose", new THREE.ConeGeometry(0.2, 0.62, 8), skin, { x: 0, y: 1.71, z: 0.61 });
+  const nose = createThemeMesh("nose", new THREE.ConeGeometry(0.2, 0.62, 8), skin, { x: 0, y: 1.71, z: 0.61 });
   nose.rotation.x = Math.PI / 2;
   group.add(nose);
 
-  addEyePair(group, "eyes", white, dark, 2.13, 0.52, 0.22, 1.12);
+  createEyePair(group, {
+    eyeGroupName: "eyes",
+    eyeWhiteMaterial: white,
+    eyeDarkMaterial: dark,
+    y: 2.13,
+    z: 0.52,
+    spacing: 0.22,
+    eyeScale: 1.12,
+  });
 
-  const mouth = mesh("mouth", new THREE.BoxGeometry(0.35, 0.035, 0.025), dark, { x: 0, y: 1.46, z: 0.69 });
+  const mouth = createThemeMesh("mouth", new THREE.BoxGeometry(0.35, 0.035, 0.025), dark, { x: 0, y: 1.46, z: 0.69 });
   mouth.rotation.z = -0.08;
   group.add(mouth);
 
@@ -124,7 +92,7 @@ export function createSquidwardParts(group: THREE.Group): SquidwardAnimationPart
     tentacle.name = `tentacle-${index}`;
     tentacle.position.set(placement.x, placement.y, placement.z);
     tentacle.rotation.set(placement.rx, 0, placement.rz);
-    const segment = mesh(
+    const segment = createThemeMesh(
       `tentacle-${index}-segment`,
       new THREE.CylinderGeometry(0.13, 0.17, 0.82, 7),
       purple,
@@ -132,7 +100,7 @@ export function createSquidwardParts(group: THREE.Group): SquidwardAnimationPart
     );
     segment.rotation.z = index < 2 ? -0.04 : 0.04;
     tentacle.add(segment);
-    const foot = mesh(
+    const foot = createThemeMesh(
       `tentacle-${index}-foot`,
       new THREE.SphereGeometry(0.18, 7, 5),
       purple,
@@ -159,14 +127,14 @@ export function createSquidwardParts(group: THREE.Group): SquidwardAnimationPart
 
 /** Build Mr. Krabs' model and return the references used by its animation. */
 export function createMrKrabsParts(group: THREE.Group): MrKrabsAnimationParts {
-  const red = standardMaterial(MR_KRABS_RED);
-  const darkRed = standardMaterial(MR_KRABS_DARK_RED);
-  const blue = standardMaterial(MR_KRABS_BLUE);
-  const yellow = standardMaterial(MR_KRABS_YELLOW, 0.62);
-  const white = standardMaterial(EYE_WHITE, 0.68);
-  const dark = standardMaterial(EYE_DARK, 0.52);
+  const red = createThemeMaterial(MR_KRABS_RED);
+  const darkRed = createThemeMaterial(MR_KRABS_DARK_RED);
+  const blue = createThemeMaterial(MR_KRABS_BLUE);
+  const yellow = createThemeMaterial(MR_KRABS_YELLOW, 0.62);
+  const white = createThemeMaterial(EYE_WHITE, 0.68);
+  const dark = createThemeMaterial(EYE_DARK, 0.52);
 
-  const body = mesh(
+  const body = createThemeMesh(
     "body",
     new THREE.SphereGeometry(0.9, 12, 8),
     red,
@@ -175,25 +143,25 @@ export function createMrKrabsParts(group: THREE.Group): MrKrabsAnimationParts {
   body.scale.set(1.12, 0.78, 0.78);
   group.add(body);
 
-  const clothing = mesh("clothing", new THREE.BoxGeometry(1.15, 0.38, 0.82), blue, { x: 0, y: 0.65, z: 0 });
+  const clothing = createThemeMesh("clothing", new THREE.BoxGeometry(1.15, 0.38, 0.82), blue, { x: 0, y: 0.65, z: 0 });
   clothing.scale.set(1, 0.9, 0.92);
   group.add(clothing);
 
-  const belt = mesh("belt", new THREE.BoxGeometry(1.03, 0.08, 0.86), darkRed, { x: 0, y: 0.86, z: 0.03 });
+  const belt = createThemeMesh("belt", new THREE.BoxGeometry(1.03, 0.08, 0.86), darkRed, { x: 0, y: 0.86, z: 0.03 });
   group.add(belt);
 
   const eyes = new THREE.Group();
   eyes.name = "eyes";
   for (let index = 0; index < 2; index += 1) {
     const x = index === 0 ? -0.22 : 0.22;
-    const stalk = mesh(`eye-stalk-${index}`, new THREE.CylinderGeometry(0.055, 0.065, 0.42, 6), red, { x, y: 2.05, z: 0 });
-    const eye = mesh(`eye-${index}`, new THREE.SphereGeometry(0.18, 8, 6), yellow, { x, y: 2.28, z: 0 });
-    const pupil = mesh(`pupil-${index}`, new THREE.SphereGeometry(0.07, 7, 5), dark, { x, y: 2.28, z: 0.15 });
+    const stalk = createThemeMesh(`eye-stalk-${index}`, new THREE.CylinderGeometry(0.055, 0.065, 0.42, 6), red, { x, y: 2.05, z: 0 });
+    const eye = createThemeMesh(`eye-${index}`, new THREE.SphereGeometry(0.18, 8, 6), yellow, { x, y: 2.28, z: 0 });
+    const pupil = createThemeMesh(`pupil-${index}`, new THREE.SphereGeometry(0.07, 7, 5), dark, { x, y: 2.28, z: 0.15 });
     eyes.add(stalk, eye, pupil);
   }
   group.add(eyes);
 
-  const mouth = mesh("mouth", new THREE.BoxGeometry(0.36, 0.055, 0.025), darkRed, { x: 0, y: 1.03, z: 0.71 });
+  const mouth = createThemeMesh("mouth", new THREE.BoxGeometry(0.36, 0.055, 0.025), darkRed, { x: 0, y: 1.03, z: 0.71 });
   group.add(mouth);
 
   const claws: THREE.Object3D[] = [];
@@ -207,16 +175,16 @@ export function createMrKrabsParts(group: THREE.Group): MrKrabsAnimationParts {
     claw.name = index === 0 ? "claw-left" : "claw-right";
     claw.position.set(placement.x, placement.y, placement.z);
     claw.rotation.z = placement.rotation;
-    const arm = mesh(`claw-${index}-arm`, new THREE.CylinderGeometry(0.13, 0.16, 0.58, 7), red, { x: index === 0 ? 0.2 : -0.2, y: 0, z: 0 });
+    const arm = createThemeMesh(`claw-${index}-arm`, new THREE.CylinderGeometry(0.13, 0.16, 0.58, 7), red, { x: index === 0 ? 0.2 : -0.2, y: 0, z: 0 });
     arm.rotation.z = index === 0 ? -Math.PI / 2 : Math.PI / 2;
     claw.add(arm);
-    const palm = mesh(`claw-${index}-palm`, new THREE.SphereGeometry(0.31, 8, 6), red, { x: index === 0 ? 0.45 : -0.45, y: 0, z: 0 });
+    const palm = createThemeMesh(`claw-${index}-palm`, new THREE.SphereGeometry(0.31, 8, 6), red, { x: index === 0 ? 0.45 : -0.45, y: 0, z: 0 });
     palm.scale.set(1.05, 0.82, 0.8);
     claw.add(palm);
-    const pincerUpper = mesh(`claw-${index}-upper`, new THREE.ConeGeometry(0.12, 0.48, 6), red, { x: index === 0 ? 0.68 : -0.68, y: 0.15, z: 0 });
+    const pincerUpper = createThemeMesh(`claw-${index}-upper`, new THREE.ConeGeometry(0.12, 0.48, 6), red, { x: index === 0 ? 0.68 : -0.68, y: 0.15, z: 0 });
     pincerUpper.rotation.z = index === 0 ? -Math.PI / 2.8 : Math.PI / 2.8;
     claw.add(pincerUpper);
-    const pincerLower = mesh(`claw-${index}-lower`, new THREE.ConeGeometry(0.12, 0.42, 6), red, { x: index === 0 ? 0.68 : -0.68, y: -0.14, z: 0 });
+    const pincerLower = createThemeMesh(`claw-${index}-lower`, new THREE.ConeGeometry(0.12, 0.42, 6), red, { x: index === 0 ? 0.68 : -0.68, y: -0.14, z: 0 });
     pincerLower.rotation.z = index === 0 ? -Math.PI / 2.3 : Math.PI / 2.3;
     claw.add(pincerLower);
     group.add(claw);
@@ -245,19 +213,6 @@ function clampRootToTank(group: THREE.Group, halfSize: THREE.Vector3): void {
   // Character geometry is authored above local y=0, so resize anchors its
   // root at the tank floor while preserving the descriptor's x/z placement.
   group.position.y = -Math.abs(halfSize.y);
-}
-
-function disposeGroup(group: THREE.Group): void {
-  group.traverse((object) => {
-    const meshObject = object as THREE.Mesh;
-    if (meshObject.geometry) meshObject.geometry.dispose();
-    const material = meshObject.material as THREE.Material | THREE.Material[] | undefined;
-    if (Array.isArray(material)) {
-      for (let index = 0; index < material.length; index += 1) material[index].dispose();
-    } else if (material) {
-      material.dispose();
-    }
-  });
 }
 
 /** Create one of the procedural SpongeBob-themed characters. */
@@ -311,7 +266,7 @@ export function createThemeCharacter(
       if (disposed) return;
       disposed = true;
       group.visible = false;
-      disposeGroup(group);
+      disposeThemeResources(group);
       group.clear();
     },
   };
